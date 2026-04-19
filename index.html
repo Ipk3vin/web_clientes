@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K Streaming — Panel de Clientes</title>
+    <meta name="description" content="Panel de administración de clientes K Streaming. Gestiona cuentas, servicios y vencimientos.">
+    <link rel="icon" href="logo.jpeg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- ===== ANIMATED BACKGROUND ===== -->
+    <div class="bg-effects">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <img src="logo.jpeg" alt="K Streaming" class="brand-logo">
+            <div>
+                <h2 class="brand-name">K Streaming</h2>
+                <span class="brand-tag">Panel Admin</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <button class="nav-item active" id="nav-clientes" data-screen="list">
+                <span class="material-icons-round">group</span>
+                <span>Clientes</span>
+            </button>
+            <button class="nav-item" id="nav-nuevo" data-screen="form">
+                <span class="material-icons-round">person_add</span>
+                <span>Nuevo Registro</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-stats" id="sidebar-stats">
+            <div class="stat-card">
+                <span class="material-icons-round stat-icon">people</span>
+                <div>
+                    <span class="stat-number" id="stat-total">—</span>
+                    <span class="stat-label">Clientes</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="material-icons-round stat-icon warning">warning</span>
+                <div>
+                    <span class="stat-number" id="stat-expiring">—</span>
+                    <span class="stat-label">Por vencer</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <span class="material-icons-round">cloud_done</span>
+            <span>Firebase conectado</span>
+        </div>
+    </aside>
+
+    <!-- ===== MOBILE HEADER ===== -->
+    <header class="mobile-header" id="mobile-header">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Menú">
+            <span class="material-icons-round">menu</span>
+        </button>
+        <div class="mobile-brand">
+            <img src="logo.jpeg" alt="K Streaming" class="brand-logo-sm">
+            <h2>K Streaming</h2>
+        </div>
+        <div class="mobile-stats">
+            <span class="badge" id="mobile-stat-total">0</span>
+        </div>
+    </header>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+
+        <!-- ============ SCREEN: CLIENT LIST ============ -->
+        <section id="screen-list" class="screen active">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Clientes</h1>
+                    <p class="page-subtitle">Gestiona todos tus clientes y sus cuentas</p>
+                </div>
+                <button class="btn-primary" id="btn-new-top">
+                    <span class="material-icons-round">add</span>
+                    Nuevo Registro
+                </button>
+            </div>
+
+            <div class="toolbar">
+                <div class="search-box" id="search-box-main">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" id="search-profiles" placeholder="Buscar por número, correo o servicio..." autocomplete="off">
+                    <kbd class="search-hint">Ctrl+K</kbd>
+                </div>
+            </div>
+
+            <div id="profiles-grid" class="profiles-grid">
+                <div class="loading-state">
+                    <div class="spinner-ring"></div>
+                    <p>Cargando clientes...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ SCREEN: CLIENT DETAIL ============ -->
+        <section id="screen-detail" class="screen">
+            <div class="page-header">
+                <div class="detail-header-left">
+                    <button class="btn-ghost" id="btn-back-detail">
+                        <span class="material-icons-round">arrow_back</span>
+                        Volver
+                    </button>
+                    <div class="detail-client-info">
+                        <div class="detail-avatar">
+                            <span class="material-icons-round">person</span>
+                        </div>
+                        <div>
+                            <h1 class="page-title" id="detail-title">+51 000 000 000</h1>
+                            <p class="page-subtitle" id="detail-count">0 cuentas registradas</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="detail-header-right">
+                    <div class="search-box compact" id="detail-search-box">
+                        <span class="material-icons-round">search</span>
+                        <input type="text" id="search-detail" placeholder="Filtrar correos..." autocomplete="off">
+                    </div>
+                    <button class="btn-primary" id="btn-add-to-client">
+                        <span class="material-icons-round">add</span>
+                        Agregar Cuenta
+                    </button>
+                    <button class="btn-ghost danger-ghost" id="btn-client-options">
+                        <span class="material-icons-round">more_vert</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="purchases-grid" class="purchases-grid">
+                <div class="loading-state">
+                    <div class="spinner-ring"></div>
+                    <p>Cargando cuentas...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ SCREEN: NEW RECORD FORM ============ -->
+        <section id="screen-form" class="screen">
+            <div class="page-header">
+                <div class="detail-header-left">
+                    <button class="btn-ghost" id="btn-back-form">
+                        <span class="material-icons-round">arrow_back</span>
+                        Volver
+                    </button>
+                    <h1 class="page-title">Nuevo Registro</h1>
+                </div>
+            </div>
+
+            <div class="form-container">
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <div class="form-logo-wrap">
+                            <img src="logo.jpeg" alt="K Streaming" class="form-logo">
+                        </div>
+                        <h2>Registrar Cliente</h2>
+                        <p>Completa los datos para agregar una nueva cuenta</p>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group full" id="field-numero">
+                            <label for="form-numero">
+                                <span class="material-icons-round">phone_android</span>
+                                Número de Cliente
+                            </label>
+                            <input type="text" id="form-numero" placeholder="+51 900 000 000" autocomplete="off">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="form-correo">
+                                <span class="material-icons-round">email</span>
+                                Correo Electrónico
+                            </label>
+                            <input type="text" id="form-correo" placeholder="correo@ejemplo.com" autocomplete="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="form-pass">
+                                <span class="material-icons-round">lock</span>
+                                Contraseña
+                            </label>
+                            <input type="text" id="form-pass" placeholder="Contraseña de la cuenta" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Perfil</h3>
+                        <div class="chips-row" id="chips-perfil"></div>
+                    </div>
+
+                    <div class="form-group" style="padding: 0 32px; max-width:320px">
+                        <label for="form-pin">
+                            <span class="material-icons-round">password</span>
+                            PIN del Perfil
+                        </label>
+                        <input type="text" id="form-pin" placeholder="1234" autocomplete="off" inputmode="numeric">
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Tipo de Usuario</h3>
+                        <div class="chips-row" id="chips-tipo-usuario"></div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Servicio</h3>
+                        <div class="chips-row" id="chips-servicio"></div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn-ghost" id="btn-form-cancel">Cancelar</button>
+                        <button class="btn-primary lg" id="btn-guardar">
+                            <span class="material-icons-round">save</span>
+                            <span class="btn-guardar-text">Guardar Registro</span>
+                            <div class="btn-spinner hidden"><div class="spinner-sm"></div></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===== MODAL: EDIT RECORD ===== -->
+    <div class="modal-overlay hidden" id="modal-edit">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2>Editar Registro</h2>
+                <button class="modal-close" id="edit-close-x"><span class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label><span class="material-icons-round">alternate_email</span> Correo</label>
+                        <input type="text" id="edit-correo" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label><span class="material-icons-round">key</span> Contraseña</label>
+                        <input type="text" id="edit-pass" autocomplete="off">
+                    </div>
+                    <div class="form-group half">
+                        <label><span class="material-icons-round">lock_outline</span> PIN</label>
+                        <input type="text" id="edit-pin" autocomplete="off" inputmode="numeric">
+                    </div>
+                    <div class="form-group half">
+                        <label><span class="material-icons-round">calendar_today</span> Fecha de Compra</label>
+                        <input type="date" id="edit-fecha" class="date-input">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Servicio</h3>
+                    <div class="chips-row" id="edit-chips-servicio"></div>
+                </div>
+                <div class="form-section">
+                    <h3>Perfil</h3>
+                    <div class="chips-row" id="edit-chips-perfil"></div>
+                </div>
+                <div class="form-section">
+                    <h3>Tipo de Usuario</h3>
+                    <div class="chips-row" id="edit-chips-tipo"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="edit-cancel">Cancelar</button>
+                <button class="btn-primary" id="edit-save">
+                    <span class="material-icons-round">check</span>
+                    Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: CLIENT OPTIONS (dropdown) ===== -->
+    <div class="modal-overlay hidden" id="modal-options">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel sm">
+            <div class="modal-header">
+                <h2>Opciones del Cliente</h2>
+                <button class="modal-close" id="options-close-x"><span class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body options-list">
+                <button class="option-btn" id="opt-edit-number">
+                    <span class="material-icons-round">edit</span>
+                    <div>
+                        <strong>Editar número</strong>
+                        <small>Cambiar el número de teléfono del cliente</small>
+                    </div>
+                </button>
+                <button class="option-btn danger" id="opt-delete-user">
+                    <span class="material-icons-round">delete_forever</span>
+                    <div>
+                        <strong>Eliminar cliente</strong>
+                        <small>Eliminar el cliente y todos sus registros</small>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: EDIT NUMBER ===== -->
+    <div class="modal-overlay hidden" id="modal-edit-number">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel sm">
+            <div class="modal-header">
+                <h2>Editar Número</h2>
+                <button class="modal-close" id="editnum-close-x"><span class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group full">
+                    <label><span class="material-icons-round">phone</span> Nuevo número</label>
+                    <input type="text" id="edit-number-input" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="edit-number-cancel">Cancelar</button>
+                <button class="btn-primary" id="edit-number-save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: CONFIRM DELETE ===== -->
+    <div class="modal-overlay hidden" id="modal-confirm-delete">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel sm">
+            <div class="modal-header">
+                <span class="material-icons-round modal-icon-danger">warning</span>
+                <h2>Confirmar Eliminación</h2>
+                <button class="modal-close" id="confirm-close-x"><span class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="confirm-text" id="confirm-delete-text"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="confirm-delete-cancel">Cancelar</button>
+                <button class="btn-danger" id="confirm-delete-ok">
+                    <span class="material-icons-round">delete</span>
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div class="toast hidden" id="toast">
+        <span class="material-icons-round toast-icon">check_circle</span>
+        <span id="toast-text"></span>
+    </div>
+
+    <!-- ===== MOBILE OVERLAY ===== -->
+    <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
