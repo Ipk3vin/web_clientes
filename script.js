@@ -502,6 +502,7 @@ $('btn-add-to-client').addEventListener('click', () => {
 // ── Edit Modal ──
 function openEditModal(docId, data) {
     editDocId = docId;
+    $('edit-numero').value = data.numero_cliente || '';
     $('edit-correo').value = data.correo || '';
     $('edit-pass').value = data.contrasena || '';
     $('edit-pin').value = data.pin || '';
@@ -550,7 +551,10 @@ $('edit-save').addEventListener('click', async () => {
     try {
         const fechaVal = $('edit-fecha').value;
         const fechaDate = fechaVal ? new Date(fechaVal + 'T00:00:00') : new Date();
+        const nuevoNumero = $('edit-numero').value.trim();
+
         await db.collection('clientes').doc(editDocId).update({
+            numero_cliente: nuevoNumero,
             correo: $('edit-correo').value,
             contrasena: $('edit-pass').value,
             pin: $('edit-pin').value,
@@ -559,7 +563,21 @@ $('edit-save').addEventListener('click', async () => {
             usuario: editState.tipo,
             fecha_orden: firebase.firestore.Timestamp.fromDate(fechaDate)
         });
-        await updateProfileSearchData(currentProfileNumber);
+
+        // Ensure the profile exists if the number changed or was typed
+        if (nuevoNumero) {
+            await db.collection('perfiles').doc(nuevoNumero).set({
+                numero: nuevoNumero,
+                ultima_actividad: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            await updateProfileSearchData(nuevoNumero);
+        }
+
+        // If the number was changed, update the old profile's search data too
+        if (nuevoNumero !== currentProfileNumber) {
+            await updateProfileSearchData(currentProfileNumber);
+        }
+
         toast('Registro actualizado');
     } catch (e) { toast('Error: ' + e.message); }
     $('modal-edit').classList.add('hidden');
@@ -704,6 +722,10 @@ $('btn-guardar').addEventListener('click', async () => {
 });
 
 $('form-numero').addEventListener('input', e => {
+    e.target.value = phoneFormat(e.target.value);
+});
+
+$('edit-numero').addEventListener('input', e => {
     e.target.value = phoneFormat(e.target.value);
 });
 
