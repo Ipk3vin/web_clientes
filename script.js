@@ -724,7 +724,15 @@ async function syncPerfiles() {
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Anonymous auth — invisible, no login screen
+    try {
+        await firebase.auth().signInAnonymously();
+        console.log('🔒 Auth OK');
+    } catch (e) {
+        console.error('Auth error:', e);
+    }
+
     syncPerfiles();
     initProfileList();
     renderFormChips();
