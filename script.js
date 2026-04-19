@@ -23,6 +23,7 @@ let optionsTargetNumber = '';
 let editDocId = '';
 let editState = {};
 let allClientsCache = [];
+let botFilterActive = false;
 
 const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'ChatGPT', 'Movistar Play', 'Otros'];
 
@@ -133,7 +134,7 @@ function getDaysInfo(fechaOrden) {
     const colorClass = dias >= 5 ? 'days-green' : (dias >= 2 ? 'days-yellow' : 'days-red');
     const colorHex = dias >= 5 ? '#4ADE80' : (dias >= 2 ? '#FBBF24' : '#F87171');
     const badgeClass = dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red');
-    return { fC, fCStr, fV, fVStr, dias, colorClass, colorHex, badgeClass };
+    return { fC, fCStr, fV, fVStr, dias, diasRaw, colorClass, colorHex, badgeClass };
 }
 
 // ═══════════════════════════════════════════════
@@ -168,8 +169,8 @@ function updateStats() {
 
     let expiring = 0;
     clientsData.forEach(c => {
-        const { dias } = getDaysInfo(c.fecha_orden);
-        if (dias <= 3) expiring++;
+        const { diasRaw } = getDaysInfo(c.fecha_orden);
+        if (diasRaw >= 0 && diasRaw <= 3) expiring++;
     });
 
     $('stat-total').textContent = totalProfiles;
@@ -200,6 +201,16 @@ function renderProfiles() {
             const prof = profilesData.find(p => p.numero === num);
             if (prof && (prof.search_emails || '').toLowerCase().includes(filter)) return true;
             return false;
+        });
+    }
+
+    if (botFilterActive) {
+        allNumbers = allNumbers.filter(num => {
+            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
+            return clientAccounts.some(c => {
+                const { diasRaw } = getDaysInfo(c.fecha_orden);
+                return diasRaw >= 0 && diasRaw <= 3;
+            });
         });
     }
 
@@ -745,3 +756,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     initProfileList();
     renderFormChips();
 });
+
+// ═══════════════════════════════════════════════
+// BOT FAB & EXPIRING CLIENTS
+// ═══════════════════════════════════════════════
+const fabBtn = $('fab-button');
+const fabIcon = $('fab-icon');
+
+if (fabBtn) {
+    fabBtn.addEventListener('click', () => {
+        botFilterActive = !botFilterActive;
+        
+        if (botFilterActive) {
+            fabIcon.textContent = 'close';
+            fabBtn.style.background = 'var(--danger)';
+            fabBtn.style.boxShadow = '0 6px 16px var(--danger-dim)';
+        } else {
+            fabIcon.textContent = 'support_agent';
+            fabBtn.style.background = '';
+            fabBtn.style.boxShadow = '';
+        }
+        
+        if (currentScreen !== 'list') {
+            showScreen('list');
+        }
+        
+        renderProfiles();
+    });
+}
