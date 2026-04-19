@@ -86,12 +86,12 @@ function parseFecha(val) {
 
 function formatDate(d) {
     if (!d) return 'N/A';
-    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 function toISODate(d) {
     if (!d) return '';
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function phoneFormat(raw) {
@@ -140,9 +140,9 @@ function getDaysInfo(fechaOrden) {
 // SCREEN 1: PROFILE LIST
 // ═══════════════════════════════════════════════
 let unsubProfiles = null;
-let unsubClients  = null;
-let profilesData  = [];
-let clientsData   = [];
+let unsubClients = null;
+let profilesData = [];
+let clientsData = [];
 
 function initProfileList() {
     unsubProfiles = db.collection('perfiles').orderBy('ultima_actividad', 'desc').onSnapshot(snap => {
@@ -240,7 +240,7 @@ function renderProfiles() {
                 <div class="profile-number">${escapeHtml(num)}</div>
                 <div class="profile-sub">
                     ${accountCount} cuenta${accountCount !== 1 ? 's' : ''}
-                    ${services.length ? ' · ' + services.slice(0,3).join(', ') : ''}
+                    ${services.length ? ' · ' + services.slice(0, 3).join(', ') : ''}
                     ${badgeHtml}
                 </div>
             </div>
@@ -516,7 +516,7 @@ function renderEditChips() {
         c.addEventListener('click', () => { editState.servicio = c.dataset.val; renderEditChips(); });
     });
 
-    $('edit-chips-perfil').innerHTML = [1,2,3,4,5,6].map(p =>
+    $('edit-chips-perfil').innerHTML = [1, 2, 3, 4, 5, 6].map(p =>
         `<div class="chip circle ${editState.perfil === String(p) ? 'selected' : ''}" data-val="${p}">${p}</div>`
     ).join('');
     $('edit-chips-perfil').querySelectorAll('.chip').forEach(c => {
@@ -567,19 +567,27 @@ async function deletePurchase(docId) {
 // ── WhatsApp ──
 function shareWhatsApp(data) {
     const { fCStr, fVStr, dias } = getDaysInfo(data.fecha_orden);
-    const msg = `¡Hola! Detalles de tu cuenta:\n\n` +
-        `📺 *Servicio:* ${data.tipo_cuenta}\n` +
-        `⭐ *Usuario:* ${data.correo}\n` +
-        `🔒 *Contraseña:* ${data.contrasena}\n\n` +
-        `👤 *Perfil:* ${data.perfil}\n` +
-        `🔢 *PIN:* ${data.pin}\n` +
-        `✅ *Tipo:* ${data.usuario}\n\n` +
-        `📅 *Compra:* ${fCStr}\n` +
-        `📆 *Vence:* ${fVStr}\n` +
-        `⏳ *Quedan:* ${dias} días\n\n` +
-        `Gracias! ✨`;
-    const phone = currentProfileNumber.replace(/\+/g, '').replace(/ /g, '');
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+
+    // Construimos el mensaje usando concatenación y \n explícitos para mayor compatibilidad
+    let msg = "\u00A1Hola! Detalles de tu cuenta:\n\n";
+    msg += "\uD83D\uDCFA *Servicio:* " + (data.tipo_cuenta || "") + "\n";
+    msg += "\u2B50 *Usuario:* " + (data.correo || "") + "\n";
+    msg += "\uD83D\uDD12 *Contraseña:* " + (data.contrasena || "") + "\n\n";
+    msg += "\uD83D\uDC64 *Perfil:* " + (data.perfil || "") + "\n";
+    msg += "\uD83D\uDD22 *PIN:* " + (data.pin || "") + "\n";
+    msg += "\u2705 *Tipo:* " + (data.usuario || "") + "\n\n";
+    msg += "\uD83D\uDCC5 *Compra:* " + fCStr + "\n";
+    msg += "\uD83D\uDCC6 *Vence:* " + fVStr + "\n";
+    msg += "\u23F3 *Quedan:* " + dias + " d\u00EDas\n\n";
+    msg += "Gracias! \u2728";
+
+    // Limpiamos el número de teléfono para que solo queden dígitos
+    const phone = currentProfileNumber.replace(/\D/g, '');
+
+    // Usamos api.whatsapp.com que suele ser más estable en navegadores antiguos o específicos
+    const url = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
+
+    window.open(url, '_blank');
 }
 
 // ═══════════════════════════════════════════════
@@ -600,7 +608,7 @@ function openForm(prefilledNumber) {
 }
 
 function renderFormChips() {
-    $('chips-perfil').innerHTML = [1,2,3,4,5,6].map(p =>
+    $('chips-perfil').innerHTML = [1, 2, 3, 4, 5, 6].map(p =>
         `<div class="chip circle ${formState.perfil === String(p) ? 'selected' : ''}" data-val="${p}">${p}</div>`
     ).join('');
     $('chips-perfil').querySelectorAll('.chip').forEach(c => {
