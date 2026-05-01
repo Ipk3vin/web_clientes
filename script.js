@@ -247,13 +247,13 @@ function renderProfiles() {
     if (activeServiceFilter) {
         grid.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
-        
+
         let filteredAccounts = [];
         allNumbers.forEach(num => {
             const clientAccounts = clientsData.filter(c => c.numero_cliente === num && c.tipo_cuenta === activeServiceFilter);
             filteredAccounts.push(...clientAccounts);
         });
-        
+
         if (filteredAccounts.length === 0) {
             if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron cuentas de ${activeServiceFilter}</td></tr>`;
         } else {
@@ -262,7 +262,7 @@ function renderProfiles() {
                 const db = getDaysInfo(b.fecha_orden).diasRaw;
                 return da - db;
             });
-            
+
             if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
                 const { fCStr, fVStr, dias, colorHex } = getDaysInfo(acc.fecha_orden);
                 return `
@@ -866,7 +866,7 @@ const fabIcon = $('fab-icon');
 if (fabBtn) {
     fabBtn.addEventListener('click', () => {
         botFilterActive = !botFilterActive;
-        
+
         if (botFilterActive) {
             fabIcon.textContent = 'close';
             fabBtn.style.background = 'var(--danger)';
@@ -876,11 +876,11 @@ if (fabBtn) {
             fabBtn.style.background = '';
             fabBtn.style.boxShadow = '';
         }
-        
+
         if (currentScreen !== 'list') {
             showScreen('list');
         }
-        
+
         renderProfiles();
     });
 }
@@ -893,32 +893,32 @@ function initServiceDropdown() {
     const list = $('dropdown-list');
     const selectedText = $('dropdown-selected');
     if (!header || !list) return;
-    
+
     let html = `<div class="dropdown-item active" data-val="">Todos los servicios</div>`;
     servicios.forEach(s => {
         html += `<div class="dropdown-item" data-val="${s}">${s}</div>`;
     });
     list.innerHTML = html;
-    
+
     header.addEventListener('click', (e) => {
         e.stopPropagation();
         list.classList.toggle('hidden');
     });
-    
+
     list.querySelectorAll('.dropdown-item').forEach(item => {
         item.addEventListener('click', (e) => {
             e.stopPropagation();
             activeServiceFilter = item.dataset.val;
             selectedText.textContent = activeServiceFilter || 'Filtrar por Servicio';
-            
+
             list.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
             item.classList.add('active');
             list.classList.add('hidden');
-            
+
             renderProfiles();
         });
     });
-    
+
     document.addEventListener('click', () => {
         list.classList.add('hidden');
     });
