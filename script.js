@@ -24,8 +24,10 @@ let editDocId = '';
 let editState = {};
 let allClientsCache = [];
 let botFilterActive = false;
+let currentNavFilter = 'all';
+let activeServiceFilter = '';
 
-const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'ChatGPT', 'Movistar Play', 'Otros'];
+const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
 
 // ── DOM shortcuts ──
 const $ = id => document.getElementById(id);
@@ -41,7 +43,11 @@ function showScreen(name) {
 
     // Update nav active state
     $$('.nav-item').forEach(n => n.classList.remove('active'));
-    if (name === 'list') $('nav-clientes').classList.add('active');
+    if (name === 'list') {
+        if (currentNavFilter === 'all') $('nav-clientes').classList.add('active');
+        else if (currentNavFilter === 'vigentes') $('nav-vigentes').classList.add('active');
+        else if (currentNavFilter === 'vencidos') $('nav-vencidos').classList.add('active');
+    }
     if (name === 'form') $('nav-nuevo').classList.add('active');
 
     // Close mobile sidebar
@@ -50,7 +56,9 @@ function showScreen(name) {
 }
 
 // Sidebar nav clicks
-$('nav-clientes').addEventListener('click', () => showScreen('list'));
+$('nav-clientes').addEventListener('click', () => { currentNavFilter = 'all'; showScreen('list'); renderProfiles(); });
+$('nav-vigentes').addEventListener('click', () => { currentNavFilter = 'vigentes'; showScreen('list'); renderProfiles(); });
+$('nav-vencidos').addEventListener('click', () => { currentNavFilter = 'vencidos'; showScreen('list'); renderProfiles(); });
 $('nav-nuevo').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 $('btn-new-top').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 
@@ -170,7 +178,7 @@ function updateStats() {
     let expiring = 0;
     clientsData.forEach(c => {
         const { diasRaw } = getDaysInfo(c.fecha_orden);
-        if (diasRaw >= 0 && diasRaw <= 3) expiring++;
+        if (diasRaw >= 0 && diasRaw <= 2) expiring++;
     });
 
     $('stat-total').textContent = totalProfiles;
@@ -180,6 +188,8 @@ function updateStats() {
 
 function renderProfiles() {
     const grid = $('profiles-grid');
+    const tableContainer = $('service-table-container');
+    const tbody = $('service-table-body');
     const filter = ($('search-profiles').value || '').toLowerCase();
 
     const clientNums = new Set(clientsData.map(c => c.numero_cliente).filter(Boolean));
@@ -209,9 +219,76 @@ function renderProfiles() {
             const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
             return clientAccounts.some(c => {
                 const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw >= 0 && diasRaw <= 3;
+                return diasRaw >= 0 && diasRaw <= 2;
             });
         });
+    }
+
+    if (currentNavFilter === 'vigentes') {
+        allNumbers = allNumbers.filter(num => {
+            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
+            if (clientAccounts.length === 0) return false;
+            return clientAccounts.some(c => {
+                const { diasRaw } = getDaysInfo(c.fecha_orden);
+                return diasRaw >= 0;
+            });
+        });
+    } else if (currentNavFilter === 'vencidos') {
+        allNumbers = allNumbers.filter(num => {
+            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
+            if (clientAccounts.length === 0) return false;
+            return clientAccounts.every(c => {
+                const { diasRaw } = getDaysInfo(c.fecha_orden);
+                return diasRaw < 0;
+            });
+        });
+    }
+
+    if (activeServiceFilter) {
+        grid.classList.add('hidden');
+        if (tableContainer) tableContainer.classList.remove('hidden');
+        
+        let filteredAccounts = [];
+        allNumbers.forEach(num => {
+            const clientAccounts = clientsData.filter(c => c.numero_cliente === num && c.tipo_cuenta === activeServiceFilter);
+            filteredAccounts.push(...clientAccounts);
+        });
+        
+        if (filteredAccounts.length === 0) {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron cuentas de ${activeServiceFilter}</td></tr>`;
+        } else {
+            filteredAccounts.sort((a, b) => {
+                const da = getDaysInfo(a.fecha_orden).diasRaw;
+                const db = getDaysInfo(b.fecha_orden).diasRaw;
+                return da - db;
+            });
+            
+            if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
+                const { fCStr, fVStr, dias, colorHex } = getDaysInfo(acc.fecha_orden);
+                return `
+                <tr style="animation-delay: ${idx * 0.05}s">
+                    <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
+                    <td>${escapeHtml(acc.correo || 'N/A')}</td>
+                    <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
+                    <td>${fCStr}</td>
+                    <td style="color: ${colorHex}; font-weight: 600;">${fVStr}</td>
+                    <td>
+                        <span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">
+                            ${dias}d
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
+                            <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+        return;
+    } else {
+        grid.classList.remove('hidden');
+        if (tableContainer) tableContainer.classList.add('hidden');
     }
 
     if (allNumbers.length === 0) {
@@ -777,6 +854,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncPerfiles();
     initProfileList();
     renderFormChips();
+    initServiceDropdown();
 });
 
 // ═══════════════════════════════════════════════
@@ -804,5 +882,44 @@ if (fabBtn) {
         }
         
         renderProfiles();
+    });
+}
+
+// ═══════════════════════════════════════════════
+// SERVICE DROPDOWN
+// ═══════════════════════════════════════════════
+function initServiceDropdown() {
+    const header = $('dropdown-header');
+    const list = $('dropdown-list');
+    const selectedText = $('dropdown-selected');
+    if (!header || !list) return;
+    
+    let html = `<div class="dropdown-item active" data-val="">Todos los servicios</div>`;
+    servicios.forEach(s => {
+        html += `<div class="dropdown-item" data-val="${s}">${s}</div>`;
+    });
+    list.innerHTML = html;
+    
+    header.addEventListener('click', (e) => {
+        e.stopPropagation();
+        list.classList.toggle('hidden');
+    });
+    
+    list.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            activeServiceFilter = item.dataset.val;
+            selectedText.textContent = activeServiceFilter || 'Filtrar por Servicio';
+            
+            list.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            list.classList.add('hidden');
+            
+            renderProfiles();
+        });
+    });
+    
+    document.addEventListener('click', () => {
+        list.classList.add('hidden');
     });
 }
