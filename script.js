@@ -27,7 +27,7 @@ let botFilterActive = false;
 let currentNavFilter = 'all';
 let activeServiceFilter = '';
 
-const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
+const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'Paramount', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
 
 // ── DOM shortcuts ──
 const $ = id => document.getElementById(id);
