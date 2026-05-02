@@ -259,28 +259,16 @@ function renderProfiles() {
         grid.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
-        // Update Headers dynamically
+        // Update Headers dynamically (Unified Structure)
         if (thead) {
-            if (botFilterActive) {
-                thead.innerHTML = `
-                    <th>Teléfono</th>
-                    <th>Servicio</th>
-                    <th>Correo</th>
-                    <th>Contraseña</th>
-                    <th>Días</th>
-                    <th>Acción</th>
-                `;
-            } else {
-                thead.innerHTML = `
-                    <th>Teléfono</th>
-                    <th>Correo</th>
-                    <th>Contraseña</th>
-                    <th>Compra</th>
-                    <th>Vence</th>
-                    <th>Días</th>
-                    <th>Acción</th>
-                `;
-            }
+            thead.innerHTML = `
+                <th>Teléfono</th>
+                <th>Servicio</th>
+                <th>Correo</th>
+                <th>Contraseña</th>
+                <th>Días</th>
+                <th style="text-align: center;">Acción</th>
+            `;
         }
 
         let filteredAccounts = [];
@@ -294,7 +282,7 @@ function renderProfiles() {
 
         if (filteredAccounts.length === 0) {
             const label = activeServiceFilter ? `cuentas de ${activeServiceFilter}` : 'cuentas';
-            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label}</td></tr>`;
         } else {
             // Sort by days remaining
             filteredAccounts.sort((a, b) => {
@@ -304,40 +292,28 @@ function renderProfiles() {
             });
 
             if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
-                const { fCStr, fVStr, dias, colorHex } = getDaysInfo(acc.fecha_orden);
+                const { dias } = getDaysInfo(acc.fecha_orden);
                 const serviceColor = getServiceColor(acc.tipo_cuenta);
                 const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
                 
-                if (botFilterActive) {
-                    return `
-                    <tr style="animation-delay: ${idx * 0.05}s">
-                        <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
-                        <td style="color: ${serviceColor}; font-weight: 800; text-shadow: 0 0 10px ${serviceColor}44;">${escapeHtml(acc.tipo_cuenta)}</td>
-                        <td>${escapeHtml(acc.correo || 'N/A')}</td>
-                        <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
-                        <td>${daysBadge}</td>
-                        <td>
-                            <button class="btn-card share" style="padding: 6px 12px; font-size: 11px;" onclick="shareWhatsAppDirect('${acc.id}')">
-                                <span class="material-icons-round" style="font-size: 14px;">send</span> WHATSAPP
-                            </button>
-                        </td>
-                    </tr>`;
-                } else {
-                    return `
-                    <tr style="animation-delay: ${idx * 0.05}s">
-                        <td style="font-weight: 600; color: ${serviceColor};">${escapeHtml(acc.numero_cliente)}</td>
-                        <td>${escapeHtml(acc.correo || 'N/A')}</td>
-                        <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
-                        <td>${fCStr}</td>
-                        <td style="color: ${colorHex}; font-weight: 600;">${fVStr}</td>
-                        <td>${daysBadge}</td>
-                        <td>
-                            <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
+                return `
+                <tr style="animation-delay: ${idx * 0.05}s">
+                    <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
+                    <td style="color: ${serviceColor}; font-weight: 800; text-shadow: 0 0 10px ${serviceColor}44;">${escapeHtml(acc.tipo_cuenta)}</td>
+                    <td>${escapeHtml(acc.correo || 'N/A')}</td>
+                    <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
+                    <td>${daysBadge}</td>
+                    <td>
+                        <div style="display: flex; gap: 8px; justify-content: center;">
+                            <button class="btn-primary" style="padding: 6px 10px; font-size: 10px; min-width: 60px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
                                 <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
                             </button>
-                        </td>
-                    </tr>`;
-                }
+                            <button class="btn-card share" style="padding: 6px 10px; font-size: 10px; min-width: 80px;" onclick="shareWhatsAppDirect('${acc.id}')">
+                                <span class="material-icons-round" style="font-size: 14px;">send</span> WHATSAPP
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
             }).join('');
         }
         return;
