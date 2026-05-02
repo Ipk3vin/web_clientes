@@ -55,8 +55,23 @@ function showScreen(name) {
 }
 
 // Sidebar nav clicks
-$('nav-clientes').addEventListener('click', () => { currentNavFilter = 'all'; showScreen('list'); renderProfiles(); });
-$('nav-vencidos').addEventListener('click', () => { currentNavFilter = 'vencidos'; showScreen('list'); renderProfiles(); });
+$('nav-clientes').addEventListener('click', () => { 
+    currentNavFilter = 'all'; 
+    showScreen('list'); 
+    renderProfiles(); 
+});
+
+$('nav-vencidos').addEventListener('click', () => { 
+    currentNavFilter = 'vencidos'; 
+    // Clear service filter when clicking Vencidos
+    activeServiceFilter = '';
+    $('dropdown-selected').textContent = 'Filtrar por Servicio';
+    $$('.dropdown-item').forEach(i => i.classList.remove('active'));
+    $$('.dropdown-item[data-val=""]').forEach(i => i.classList.add('active'));
+    
+    showScreen('list'); 
+    renderProfiles(); 
+});
 $('nav-nuevo').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 $('btn-new-top').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 
@@ -922,11 +937,17 @@ if (fabBtn) {
             fabIcon.textContent = 'close';
             fabBtn.style.background = 'var(--danger)';
             fabBtn.style.boxShadow = '0 6px 16px var(--danger-dim)';
-            // Clear service filter for "all accounts" view
+            
+            // Clear service filter
             activeServiceFilter = '';
             $('dropdown-selected').textContent = 'Filtrar por Servicio';
             $$('.dropdown-item').forEach(i => i.classList.remove('active'));
             $$('.dropdown-item[data-val=""]').forEach(i => i.classList.add('active'));
+
+            // IF IN VENCIDOS, RETURN TO CLIENTES
+            if (currentNavFilter === 'vencidos') {
+                currentNavFilter = 'all';
+            }
         } else {
             fabIcon.textContent = 'support_agent';
             fabBtn.style.background = '';
