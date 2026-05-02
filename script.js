@@ -157,6 +157,10 @@ function initProfileList() {
     unsubProfiles = db.collection('perfiles').orderBy('ultima_actividad', 'desc').onSnapshot(snap => {
         profilesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         renderProfiles();
+    }, err => {
+        console.error("Error al cargar perfiles:", err);
+        toast("Error de permisos: Verifica los dominios en Firebase.");
+        $('profiles-grid').innerHTML = `<div class="empty-state"><span class="material-icons-round" style="color:var(--danger)">error</span><p>Error de conexión</p><small>Asegúrate de agregar tu dominio de GitHub a los dominios autorizados en Firebase Authentication.</small></div>`;
     });
 
     unsubClients = db.collection('clientes').onSnapshot(snap => {
@@ -164,6 +168,8 @@ function initProfileList() {
         allClientsCache = clientsData;
         updateStats();
         renderProfiles();
+    }, err => {
+        console.error("Error al cargar clientes:", err);
     });
 
     $('search-profiles').addEventListener('input', () => renderProfiles());
