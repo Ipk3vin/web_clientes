@@ -26,6 +26,21 @@ let allClientsCache = [];
 let botFilterActive = false;
 let currentNavFilter = 'all';
 let activeServiceFilter = '';
+let sentStatusMap = {}; // Temporary map for session status
+
+function toggleSentStatus(id) {
+    if (sentStatusMap[id]) return; // Already sent
+    sentStatusMap[id] = true;
+    renderProfiles();
+    
+    // Auto-reset after 1 minute
+    setTimeout(() => {
+        if (sentStatusMap[id]) {
+            delete sentStatusMap[id];
+            renderProfiles();
+        }
+    }, 60000);
+}
 
 const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'Paramount', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
 
@@ -273,6 +288,7 @@ function renderProfiles() {
                 <th>Correo</th>
                 <th>Contraseña</th>
                 <th>Días</th>
+                <th style="text-align: center;">Estado</th>
                 <th style="text-align: center;">Acción</th>
             `;
         }
@@ -300,7 +316,7 @@ function renderProfiles() {
         if (filteredAccounts.length === 0) {
             const label = activeServiceFilter ? `cuentas de ${activeServiceFilter}` : 'cuentas';
             const statusLabel = currentNavFilter === 'vencidos' ? 'vencidas' : 'vigentes';
-            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label} ${statusLabel}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label} ${statusLabel}</td></tr>`;
         } else {
             // Sort by days remaining
             filteredAccounts.sort((a, b) => {
@@ -313,6 +329,7 @@ function renderProfiles() {
                 const { dias } = getDaysInfo(acc.fecha_orden);
                 const serviceColor = getServiceColor(acc.tipo_cuenta);
                 const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
+                const isSent = sentStatusMap[acc.id];
                 
                 return `
                 <tr style="animation-delay: ${idx * 0.05}s">
@@ -321,6 +338,11 @@ function renderProfiles() {
                     <td>${escapeHtml(acc.correo || 'N/A')}</td>
                     <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
                     <td>${daysBadge}</td>
+                    <td>
+                        <div class="status-indicator ${isSent ? 'sent' : ''}" onclick="toggleSentStatus('${acc.id}')">
+                            <span class="material-icons-round">${isSent ? 'check_circle' : 'radio_button_unchecked'}</span>
+                        </div>
+                    </td>
                     <td>
                         <div style="display: flex; gap: 8px; justify-content: center;">
                             <button class="btn-primary" style="padding: 6px 10px; font-size: 10px; min-width: 60px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">

@@ -668,12 +668,52 @@ a {
     table-layout: fixed;
 }
 
-.service-table th:nth-child(1), .service-table td:nth-child(1) { width: 130px; }
-.service-table th:nth-child(2), .service-table td:nth-child(2) { width: 110px; }
-.service-table th:nth-child(3), .service-table td:nth-child(3) { width: 220px; }
-.service-table th:nth-child(4), .service-table td:nth-child(4) { width: 140px; }
-.service-table th:nth-child(5), .service-table td:nth-child(5) { width: 80px; text-align: center; }
-.service-table th:nth-child(6), .service-table td:nth-child(6) { width: 180px; text-align: center; }
+.service-table th:nth-child(1), .service-table td:nth-child(1) { width: 120px; }
+.service-table th:nth-child(2), .service-table td:nth-child(2) { width: 100px; }
+.service-table th:nth-child(3), .service-table td:nth-child(3) { width: 200px; }
+.service-table th:nth-child(4), .service-table td:nth-child(4) { width: 130px; }
+.service-table th:nth-child(5), .service-table td:nth-child(5) { width: 70px; text-align: center; }
+.service-table th:nth-child(6), .service-table td:nth-child(6) { width: 80px; text-align: center; }
+.service-table th:nth-child(7), .service-table td:nth-child(7) { width: 170px; text-align: center; }
+
+.status-indicator {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1.5px solid var(--border);
+    color: var(--text-muted);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    margin: 0 auto;
+}
+
+.status-indicator:hover {
+    transform: scale(1.15);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.status-indicator.sent {
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    border-color: #25D366;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(37, 211, 102, 0.4);
+    animation: statusPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes statusPop {
+    0% { transform: scale(0.5); opacity: 0; }
+    70% { transform: scale(1.2); }
+    100% { transform: scale(1.1); opacity: 1; }
+}
+
+.status-indicator.sent .material-icons-round {
+    font-size: 18px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
 
 .service-table th {
     background: rgba(255, 255, 255, 0.03);
