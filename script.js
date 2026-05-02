@@ -150,12 +150,15 @@ function getDaysInfo(fechaOrden) {
     const fCStr = formatDate(fC);
     const fV = fC ? new Date(fC.getTime() + 31 * 24 * 60 * 60 * 1000) : null;
     const fVStr = formatDate(fV);
-    const diasRaw = fV ? Math.floor((fV.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
-    const dias = diasRaw < 0 ? 0 : diasRaw;
+    const diff = fV ? (fV.getTime() - Date.now()) : 0;
+    const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    // Expired accounts (dias < 0) are always red
     const colorClass = dias >= 5 ? 'days-green' : (dias >= 2 ? 'days-yellow' : 'days-red');
     const colorHex = dias >= 5 ? '#4ADE80' : (dias >= 2 ? '#FBBF24' : '#F87171');
     const badgeClass = dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red');
-    return { fC, fCStr, fV, fVStr, dias, diasRaw, colorClass, colorHex, badgeClass };
+    
+    return { fC, fCStr, fV, fVStr, dias, diasRaw: dias, colorClass, colorHex, badgeClass };
 }
 
 // ═══════════════════════════════════════════════
@@ -277,12 +280,21 @@ function renderProfiles() {
             if (activeServiceFilter) {
                 accounts = accounts.filter(c => c.tipo_cuenta === activeServiceFilter);
             }
+
+            // FILTER BY STATUS (Vigente vs Vencido)
+            accounts = accounts.filter(acc => {
+                const { dias } = getDaysInfo(acc.fecha_orden);
+                if (currentNavFilter === 'vencidos') return dias < 0;
+                return dias >= 0;
+            });
+
             filteredAccounts.push(...accounts);
         });
 
         if (filteredAccounts.length === 0) {
             const label = activeServiceFilter ? `cuentas de ${activeServiceFilter}` : 'cuentas';
-            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label}</td></tr>`;
+            const statusLabel = currentNavFilter === 'vencidos' ? 'vencidas' : 'vigentes';
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label} ${statusLabel}</td></tr>`;
         } else {
             // Sort by days remaining
             filteredAccounts.sort((a, b) => {
@@ -334,19 +346,31 @@ function renderProfiles() {
 
     grid.innerHTML = allNumbers.map(num => {
         // Build a mini summary for this profile
-        const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
+        let clientAccounts = clientsData.filter(c => c.numero_cliente === num);
+
+        // Filter accounts by current view (Vigente vs Vencido)
+        clientAccounts = clientAccounts.filter(c => {
+            const { dias } = getDaysInfo(c.fecha_orden);
+            if (currentNavFilter === 'vencidos') return dias < 0;
+            return dias >= 0;
+        });
+
         const accountCount = clientAccounts.length;
+        if (accountCount === 0) return ''; // Don't show empty profiles for the current view
+
         const services = [...new Set(clientAccounts.map(c => c.tipo_cuenta).filter(Boolean))];
 
         // Find nearest expiration
         let minDays = Infinity;
         clientAccounts.forEach(c => {
             const { dias } = getDaysInfo(c.fecha_orden);
-            if (dias < minDays) minDays = dias;
+            if (minDays === Infinity || (currentNavFilter === 'vencidos' ? dias > minDays : dias < minDays)) {
+                minDays = dias;
+            }
         });
 
         const badgeClass = minDays >= 5 ? 'green' : (minDays >= 2 ? 'yellow' : 'red');
-        const badgeHtml = accountCount > 0 && minDays < Infinity
+        const badgeHtml = accountCount > 0 && minDays !== Infinity
             ? `<span class="profile-badge ${badgeClass}">${minDays}d</span>`
             : '';
 
@@ -488,6 +512,12 @@ function renderPurchases(docs) {
         return (t2 || new Date()).getTime() - (t1 || new Date()).getTime();
     });
 
+    // Filter out expired accounts for the user detail view
+    sorted = sorted.filter(d => {
+        const { dias } = getDaysInfo(d.data().fecha_orden);
+        return dias >= 0;
+    });
+
     if (filter) {
         sorted = sorted.filter(d => (d.data().correo || '').toLowerCase().includes(filter));
     }
@@ -496,7 +526,7 @@ function renderPurchases(docs) {
         grid.innerHTML = `
             <div class="empty-state">
                 <span class="material-icons-round">search_off</span>
-                <p>Sin resultados</p>
+                <p>Sin cuentas vigentes</p>
             </div>`;
         return;
     }
