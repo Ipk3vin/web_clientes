@@ -26,21 +26,33 @@ let allClientsCache = [];
 let botFilterActive = false;
 let currentNavFilter = 'all';
 let activeServiceFilter = '';
-let sentStatusMap = {}; // Temporary map for session status
+let sentStatusMap = JSON.parse(localStorage.getItem('sent_status') || '{}');
 
 function toggleSentStatus(id) {
-    if (sentStatusMap[id]) return; // Already sent
-    sentStatusMap[id] = true;
+    if (sentStatusMap[id]) return; // Already marked as sent
+    sentStatusMap[id] = Date.now();
+    localStorage.setItem('sent_status', JSON.stringify(sentStatusMap));
     renderProfiles();
-    
-    // Auto-reset after 1 minute
-    setTimeout(() => {
-        if (sentStatusMap[id]) {
-            delete sentStatusMap[id];
-            renderProfiles();
-        }
-    }, 60000);
 }
+
+function cleanSentStatus() {
+    const now = Date.now();
+    const limit = 24 * 60 * 60 * 1000; // 24 hours
+    let changed = false;
+    for (const key in sentStatusMap) {
+        if (now - sentStatusMap[key] > limit) {
+            delete sentStatusMap[key];
+            changed = true;
+        }
+    }
+    if (changed) {
+        localStorage.setItem('sent_status', JSON.stringify(sentStatusMap));
+        renderProfiles();
+    }
+}
+// Initial clean and periodic check
+cleanSentStatus();
+setInterval(cleanSentStatus, 600000); // Every 10 mins
 
 const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'Paramount', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
 
