@@ -45,7 +45,6 @@ function showScreen(name) {
     $$('.nav-item').forEach(n => n.classList.remove('active'));
     if (name === 'list') {
         if (currentNavFilter === 'all') $('nav-clientes').classList.add('active');
-        else if (currentNavFilter === 'vigentes') $('nav-vigentes').classList.add('active');
         else if (currentNavFilter === 'vencidos') $('nav-vencidos').classList.add('active');
     }
     if (name === 'form') $('nav-nuevo').classList.add('active');
@@ -57,7 +56,6 @@ function showScreen(name) {
 
 // Sidebar nav clicks
 $('nav-clientes').addEventListener('click', () => { currentNavFilter = 'all'; showScreen('list'); renderProfiles(); });
-$('nav-vigentes').addEventListener('click', () => { currentNavFilter = 'vigentes'; showScreen('list'); renderProfiles(); });
 $('nav-vencidos').addEventListener('click', () => { currentNavFilter = 'vencidos'; showScreen('list'); renderProfiles(); });
 $('nav-nuevo').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 $('btn-new-top').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
@@ -237,28 +235,18 @@ function renderProfiles() {
         });
     }
 
-    if (currentNavFilter === 'vigentes') {
+    if (currentNavFilter === 'vencidos') {
         allNumbers = allNumbers.filter(num => {
             const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-            if (clientAccounts.length === 0) return false;
             return clientAccounts.some(c => {
-                const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw >= 0;
-            });
-        });
-    } else if (currentNavFilter === 'vencidos') {
-        allNumbers = allNumbers.filter(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-            if (clientAccounts.length === 0) return false;
-            return clientAccounts.every(c => {
-                const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw < 0;
+                const { dias } = getDaysInfo(c.fecha_orden);
+                return dias < 0;
             });
         });
     }
 
-    // TABLE VIEW MODE (Active Service or Bot Mode)
-    if (activeServiceFilter || botFilterActive) {
+    // TABLE VIEW MODE (Active Service, Bot Mode, or Vencidos Tab)
+    if (activeServiceFilter || botFilterActive || currentNavFilter === 'vencidos') {
         grid.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
@@ -277,13 +265,16 @@ function renderProfiles() {
         let filteredAccounts = [];
         allNumbers.forEach(num => {
             let accounts = clientsData.filter(c => c.numero_cliente === num);
+            
+            // Filter by Service if selected
             if (activeServiceFilter) {
                 accounts = accounts.filter(c => c.tipo_cuenta === activeServiceFilter);
             }
 
-            // FILTER BY STATUS (Vigente vs Vencido)
+            // Filter by Status based on Tab
             accounts = accounts.filter(acc => {
                 const { dias } = getDaysInfo(acc.fecha_orden);
+                // In Bot mode or Search we might show all, but user wants Vencidos only in Vencidos tab
                 if (currentNavFilter === 'vencidos') return dias < 0;
                 return dias >= 0;
             });
@@ -348,25 +339,17 @@ function renderProfiles() {
         // Build a mini summary for this profile
         let clientAccounts = clientsData.filter(c => c.numero_cliente === num);
 
-        // Filter accounts by current view (Vigente vs Vencido)
-        clientAccounts = clientAccounts.filter(c => {
-            const { dias } = getDaysInfo(c.fecha_orden);
-            if (currentNavFilter === 'vencidos') return dias < 0;
-            return dias >= 0;
-        });
-
-        const accountCount = clientAccounts.length;
-        if (accountCount === 0) return ''; // Don't show empty profiles for the current view
-
+        // For the grid view (Clientes/All), we only count Vigentes (>=0) for the badge,
+        // but we still show the profile card even if count is 0.
+        const activeAccounts = clientAccounts.filter(c => getDaysInfo(c.fecha_orden).dias >= 0);
+        const accountCount = activeAccounts.length;
         const services = [...new Set(clientAccounts.map(c => c.tipo_cuenta).filter(Boolean))];
 
-        // Find nearest expiration
+        // Find nearest expiration among active accounts
         let minDays = Infinity;
-        clientAccounts.forEach(c => {
+        activeAccounts.forEach(c => {
             const { dias } = getDaysInfo(c.fecha_orden);
-            if (minDays === Infinity || (currentNavFilter === 'vencidos' ? dias > minDays : dias < minDays)) {
-                minDays = dias;
-            }
+            if (dias < minDays) minDays = dias;
         });
 
         const badgeClass = minDays >= 5 ? 'green' : (minDays >= 2 ? 'yellow' : 'red');
