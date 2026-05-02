@@ -28,31 +28,30 @@ let currentNavFilter = 'all';
 let activeServiceFilter = '';
 let sentStatusMap = JSON.parse(localStorage.getItem('sent_status') || '{}');
 
-function toggleSentStatus(id) {
-    if (sentStatusMap[id]) return; // Already marked as sent
-    sentStatusMap[id] = Date.now();
-    localStorage.setItem('sent_status', JSON.stringify(sentStatusMap));
-    renderProfiles();
+// ESTADO: Usa Firestore (campo estado_timestamp) para sincronizar con la app Flutter.
+// Así el estado es compartido en tiempo real entre web y app.
+async function toggleSentStatus(docId, currentIsGreen) {
+    try {
+        if (currentIsGreen) {
+            await db.collection('clientes').doc(docId).update({
+                estado_timestamp: firebase.firestore.FieldValue.delete()
+            });
+        } else {
+            await db.collection('clientes').doc(docId).update({
+                estado_timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+    } catch (e) {
+        console.error('Error al actualizar estado:', e);
+        toast('Error al actualizar el estado');
+    }
 }
 
-function cleanSentStatus() {
-    const now = Date.now();
-    const limit = 24 * 60 * 60 * 1000; // 24 hours
-    let changed = false;
-    for (const key in sentStatusMap) {
-        if (now - sentStatusMap[key] > limit) {
-            delete sentStatusMap[key];
-            changed = true;
-        }
-    }
-    if (changed) {
-        localStorage.setItem('sent_status', JSON.stringify(sentStatusMap));
-        renderProfiles();
-    }
+function isEstadoActivo(estadoTimestamp) {
+    if (!estadoTimestamp) return false;
+    const ts = estadoTimestamp.toDate ? estadoTimestamp.toDate() : new Date(estadoTimestamp);
+    return (Date.now() - ts.getTime()) < 24 * 60 * 60 * 1000;
 }
-// Initial clean and periodic check
-cleanSentStatus();
-setInterval(cleanSentStatus, 600000); // Every 10 mins
 
 const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'Paramount', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
 
@@ -341,7 +340,6 @@ function renderProfiles() {
                 const { dias } = getDaysInfo(acc.fecha_orden);
                 const serviceColor = getServiceColor(acc.tipo_cuenta);
                 const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
-                const isSent = sentStatusMap[acc.id];
 
                 return `
                 <tr style="animation-delay: ${idx * 0.05}s">
@@ -351,8 +349,8 @@ function renderProfiles() {
                     <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
                     <td>${daysBadge}</td>
                     <td>
-                        <div class="status-indicator ${isSent ? 'sent' : ''}" onclick="toggleSentStatus('${acc.id}')">
-                            <span class="material-icons-round">${isSent ? 'check_circle' : 'radio_button_unchecked'}</span>
+                        <div class="status-indicator ${isEstadoActivo(acc.estado_timestamp) ? 'sent' : ''}" onclick="toggleSentStatus('${acc.id}', ${isEstadoActivo(acc.estado_timestamp)})">
+                            <span class="material-icons-round">${isEstadoActivo(acc.estado_timestamp) ? 'check_circle' : 'radio_button_unchecked'}</span>
                         </div>
                     </td>
                     <td>
