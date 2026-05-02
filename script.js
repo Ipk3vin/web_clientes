@@ -132,6 +132,19 @@ function toast(msg) {
     toast._t = setTimeout(() => t.classList.add('hidden'), 3500);
 }
 
+function getServiceColor(servicio) {
+    const s = (servicio || '').toLowerCase();
+    if (s.includes('netflix')) return 'var(--color-netflix)';
+    if (s.includes('disney')) return 'var(--color-disney)';
+    if (s.includes('hbo') || s.includes('max')) return 'var(--color-hbo)';
+    if (s.includes('prime')) return 'var(--color-prime)';
+    if (s.includes('paramount')) return 'var(--color-paramount)';
+    if (s.includes('chatgpt')) return 'var(--color-chatgpt)';
+    if (s.includes('movistar')) return 'var(--color-movistar)';
+    if (s.includes('crunchyroll')) return 'var(--color-crunchyroll)';
+    return 'var(--color-otros)';
+}
+
 function getDaysInfo(fechaOrden) {
     const fC = parseFecha(fechaOrden);
     const fCStr = formatDate(fC);
@@ -292,13 +305,14 @@ function renderProfiles() {
 
             if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
                 const { fCStr, fVStr, dias, colorHex } = getDaysInfo(acc.fecha_orden);
+                const serviceColor = getServiceColor(acc.tipo_cuenta);
                 const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
                 
                 if (botFilterActive) {
                     return `
                     <tr style="animation-delay: ${idx * 0.05}s">
                         <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
-                        <td style="color: var(--primary); font-weight: 700;">${escapeHtml(acc.tipo_cuenta)}</td>
+                        <td style="color: ${serviceColor}; font-weight: 800; text-shadow: 0 0 10px ${serviceColor}44;">${escapeHtml(acc.tipo_cuenta)}</td>
                         <td>${escapeHtml(acc.correo || 'N/A')}</td>
                         <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
                         <td>${daysBadge}</td>
@@ -311,7 +325,7 @@ function renderProfiles() {
                 } else {
                     return `
                     <tr style="animation-delay: ${idx * 0.05}s">
-                        <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
+                        <td style="font-weight: 600; color: ${serviceColor};">${escapeHtml(acc.numero_cliente)}</td>
                         <td>${escapeHtml(acc.correo || 'N/A')}</td>
                         <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
                         <td>${fCStr}</td>
@@ -514,12 +528,13 @@ function renderPurchases(docs) {
     grid.innerHTML = sorted.map((doc, idx) => {
         const data = doc.data();
         const { fCStr, fVStr, dias, colorClass, colorHex } = getDaysInfo(data.fecha_orden);
+        const serviceColor = getServiceColor(data.tipo_cuenta);
 
         return `
         <div class="purchase-card" style="animation-delay:${idx * 0.07}s">
             <div class="card-top">
                 <div class="card-top-left">
-                    <h3>${escapeHtml(data.tipo_cuenta || 'Servicio')}</h3>
+                    <h3 style="color: ${serviceColor}; text-shadow: 0 0 12px ${serviceColor}33;">${escapeHtml(data.tipo_cuenta || 'Servicio')}</h3>
                     <span>${escapeHtml(data.usuario || 'Master')}</span>
                 </div>
                 <div class="days-badge ${colorClass}">
@@ -639,9 +654,12 @@ function openEditModal(docId, data) {
 }
 
 function renderEditChips() {
-    $('edit-chips-servicio').innerHTML = servicios.map(s =>
-        `<div class="chip ${editState.servicio === s ? 'selected' : ''}" data-val="${s}">${s}</div>`
-    ).join('');
+    $('edit-chips-servicio').innerHTML = servicios.map(s => {
+        const isSelected = editState.servicio === s;
+        const color = isSelected ? getServiceColor(s) : '';
+        const style = isSelected ? `style="background: ${color}; border-color: ${color}; color: #000; font-weight: 800; box-shadow: 0 4px 14px ${color}44;"` : '';
+        return `<div class="chip ${isSelected ? 'selected' : ''}" data-val="${s}" ${style}>${s}</div>`;
+    }).join('');
     $('edit-chips-servicio').querySelectorAll('.chip').forEach(c => {
         c.addEventListener('click', () => { editState.servicio = c.dataset.val; renderEditChips(); });
     });
@@ -769,9 +787,12 @@ function renderFormChips() {
         c.addEventListener('click', () => { formState.tipo = c.dataset.val; renderFormChips(); });
     });
 
-    $('chips-servicio').innerHTML = servicios.map(s =>
-        `<div class="chip ${formState.servicio === s ? 'selected' : ''}" data-val="${s}">${s}</div>`
-    ).join('');
+    $('chips-servicio').innerHTML = servicios.map(s => {
+        const isSelected = formState.servicio === s;
+        const color = isSelected ? getServiceColor(s) : '';
+        const style = isSelected ? `style="background: ${color}; border-color: ${color}; color: #000; font-weight: 800; box-shadow: 0 4px 14px ${color}44;"` : '';
+        return `<div class="chip ${isSelected ? 'selected' : ''}" data-val="${s}" ${style}>${s}</div>`;
+    }).join('');
     $('chips-servicio').querySelectorAll('.chip').forEach(c => {
         c.addEventListener('click', () => { formState.servicio = c.dataset.val; renderFormChips(); });
     });
