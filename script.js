@@ -196,6 +196,7 @@ function renderProfiles() {
     const grid = $('profiles-grid');
     const tableContainer = $('service-table-container');
     const tbody = $('service-table-body');
+    const thead = tableContainer ? tableContainer.querySelector('thead tr') : null;
     const filter = ($('search-profiles').value || '').toLowerCase();
 
     const clientNums = new Set(clientsData.map(c => c.numero_cliente).filter(Boolean));
@@ -220,16 +221,6 @@ function renderProfiles() {
         });
     }
 
-    if (botFilterActive) {
-        allNumbers = allNumbers.filter(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-            return clientAccounts.some(c => {
-                const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw >= 0 && diasRaw <= 2;
-            });
-        });
-    }
-
     if (currentNavFilter === 'vigentes') {
         allNumbers = allNumbers.filter(num => {
             const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
@@ -250,19 +241,49 @@ function renderProfiles() {
         });
     }
 
-    if (activeServiceFilter) {
+    // TABLE VIEW MODE (Active Service or Bot Mode)
+    if (activeServiceFilter || botFilterActive) {
         grid.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
+        // Update Headers dynamically
+        if (thead) {
+            if (botFilterActive) {
+                thead.innerHTML = `
+                    <th>Teléfono</th>
+                    <th>Servicio</th>
+                    <th>Correo</th>
+                    <th>Contraseña</th>
+                    <th>Días</th>
+                    <th>Acción</th>
+                `;
+            } else {
+                thead.innerHTML = `
+                    <th>Teléfono</th>
+                    <th>Correo</th>
+                    <th>Contraseña</th>
+                    <th>Compra</th>
+                    <th>Vence</th>
+                    <th>Días</th>
+                    <th>Acción</th>
+                `;
+            }
+        }
+
         let filteredAccounts = [];
         allNumbers.forEach(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num && c.tipo_cuenta === activeServiceFilter);
-            filteredAccounts.push(...clientAccounts);
+            let accounts = clientsData.filter(c => c.numero_cliente === num);
+            if (activeServiceFilter) {
+                accounts = accounts.filter(c => c.tipo_cuenta === activeServiceFilter);
+            }
+            filteredAccounts.push(...accounts);
         });
 
         if (filteredAccounts.length === 0) {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron cuentas de ${activeServiceFilter}</td></tr>`;
+            const label = activeServiceFilter ? `cuentas de ${activeServiceFilter}` : 'cuentas';
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label}</td></tr>`;
         } else {
+            // Sort by days remaining
             filteredAccounts.sort((a, b) => {
                 const da = getDaysInfo(a.fecha_orden).diasRaw;
                 const db = getDaysInfo(b.fecha_orden).diasRaw;
@@ -271,24 +292,38 @@ function renderProfiles() {
 
             if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
                 const { fCStr, fVStr, dias, colorHex } = getDaysInfo(acc.fecha_orden);
-                return `
-                <tr style="animation-delay: ${idx * 0.05}s">
-                    <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
-                    <td>${escapeHtml(acc.correo || 'N/A')}</td>
-                    <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
-                    <td>${fCStr}</td>
-                    <td style="color: ${colorHex}; font-weight: 600;">${fVStr}</td>
-                    <td>
-                        <span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">
-                            ${dias}d
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
-                            <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
-                        </button>
-                    </td>
-                </tr>`;
+                const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
+                
+                if (botFilterActive) {
+                    return `
+                    <tr style="animation-delay: ${idx * 0.05}s">
+                        <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
+                        <td style="color: var(--primary); font-weight: 700;">${escapeHtml(acc.tipo_cuenta)}</td>
+                        <td>${escapeHtml(acc.correo || 'N/A')}</td>
+                        <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
+                        <td>${daysBadge}</td>
+                        <td>
+                            <button class="btn-card share" style="padding: 6px 12px; font-size: 11px;" onclick="shareWhatsAppDirect('${acc.id}')">
+                                <span class="material-icons-round" style="font-size: 14px;">send</span> WHATSAPP
+                            </button>
+                        </td>
+                    </tr>`;
+                } else {
+                    return `
+                    <tr style="animation-delay: ${idx * 0.05}s">
+                        <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
+                        <td>${escapeHtml(acc.correo || 'N/A')}</td>
+                        <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
+                        <td>${fCStr}</td>
+                        <td style="color: ${colorHex}; font-weight: 600;">${fVStr}</td>
+                        <td>${daysBadge}</td>
+                        <td>
+                            <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
+                                <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
+                            </button>
+                        </td>
+                    </tr>`;
+                }
             }).join('');
         }
         return;
@@ -877,6 +912,11 @@ if (fabBtn) {
             fabIcon.textContent = 'close';
             fabBtn.style.background = 'var(--danger)';
             fabBtn.style.boxShadow = '0 6px 16px var(--danger-dim)';
+            // Clear service filter for "all accounts" view
+            activeServiceFilter = '';
+            $('dropdown-selected').textContent = 'Filtrar por Servicio';
+            $$('.dropdown-item').forEach(i => i.classList.remove('active'));
+            $$('.dropdown-item[data-val=""]').forEach(i => i.classList.add('active'));
         } else {
             fabIcon.textContent = 'support_agent';
             fabBtn.style.background = '';
@@ -889,6 +929,15 @@ if (fabBtn) {
 
         renderProfiles();
     });
+}
+
+function shareWhatsAppDirect(docId) {
+    const data = clientsData.find(c => c.id === docId);
+    if (data) {
+        // Build a temporary structure to pass the number
+        currentProfileNumber = data.numero_cliente;
+        shareWhatsApp(data);
+    }
 }
 
 // ═══════════════════════════════════════════════
