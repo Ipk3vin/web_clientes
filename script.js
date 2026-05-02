@@ -544,12 +544,6 @@ function renderPurchases(docs) {
         return (t2 || new Date()).getTime() - (t1 || new Date()).getTime();
     });
 
-    // Filter out expired accounts for the user detail view
-    sorted = sorted.filter(d => {
-        const { dias } = getDaysInfo(d.data().fecha_orden);
-        return dias >= 0;
-    });
-
     if (filter) {
         sorted = sorted.filter(d => (d.data().correo || '').toLowerCase().includes(filter));
     }
@@ -558,7 +552,7 @@ function renderPurchases(docs) {
         grid.innerHTML = `
             <div class="empty-state">
                 <span class="material-icons-round">search_off</span>
-                <p>Sin cuentas vigentes</p>
+                <p>Sin resultados</p>
             </div>`;
         return;
     }
