@@ -1,925 +1,1826 @@
 /* =========================================================
    K STREAMING — WEB DASHBOARD
-   Full Firestore CRUD — adapted for web dashboard layout
+   Premium dark theme admin panel
    ========================================================= */
 
-// ── Firebase Config ──
-const firebaseConfig = {
-    apiKey: "AIzaSyA_txdgtjbkXrgSuliNZY-6TcX6R3U3trE",
-    authDomain: "dbclientes-ab21a.firebaseapp.com",
-    projectId: "dbclientes-ab21a",
-    storageBucket: "dbclientes-ab21a.firebasestorage.app",
-    messagingSenderId: "12970129656",
-    appId: "1:12970129656:web:b9bc9caef3c60027d5e30d"
-};
+/* ── Tokens ── */
+:root {
+    --bg-base: #060918;
+    --bg-surface: #0c1225;
+    --bg-card: #111a33;
+    --bg-card-hover: #162040;
+    --bg-input: #0f1830;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-hover: rgba(56, 189, 248, 0.25);
+    --primary: #38BDF8;
+    --primary-dim: rgba(56, 189, 248, 0.15);
+    --primary-glow: rgba(56, 189, 248, 0.25);
+    --secondary: #4ADE80;
+    --accent-purple: #A78BFA;
+    --danger: #F87171;
+    --danger-dim: rgba(248, 113, 113, 0.12);
+    --warning: #FBBF24;
+    --warning-dim: rgba(251, 191, 36, 0.12);
+    --whatsapp: #25D366;
+    --whatsapp-dark: #128C7E;
+    --text: #E2E8F0;
+    --text-dim: #64748B;
+    --text-muted: #475569;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --sidebar-w: 270px;
+    --radius-xl: 20px;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-// ── State ──
-let currentScreen = 'list';
-let currentProfileNumber = '';
-let optionsTargetNumber = '';
-let editDocId = '';
-let editState = {};
-let allClientsCache = [];
-let botFilterActive = false;
-let currentNavFilter = 'all';
-let activeServiceFilter = '';
+html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+}
 
-const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
+body {
+    font-family: var(--font);
+    background: var(--bg-base);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
 
-// ── DOM shortcuts ──
-const $ = id => document.getElementById(id);
-const $$ = sel => document.querySelectorAll(sel);
+input,
+button,
+select,
+textarea {
+    font-family: var(--font);
+    color: var(--text);
+}
 
-// ═══════════════════════════════════════════════
-// NAVIGATION
-// ═══════════════════════════════════════════════
-function showScreen(name) {
-    $$('.screen').forEach(s => s.classList.remove('active'));
-    $((`screen-${name}`)).classList.add('active');
-    currentScreen = name;
+a {
+    color: var(--primary);
+    text-decoration: none;
+}
 
-    // Update nav active state
-    $$('.nav-item').forEach(n => n.classList.remove('active'));
-    if (name === 'list') {
-        if (currentNavFilter === 'all') $('nav-clientes').classList.add('active');
-        else if (currentNavFilter === 'vigentes') $('nav-vigentes').classList.add('active');
-        else if (currentNavFilter === 'vencidos') $('nav-vencidos').classList.add('active');
+::selection {
+    background: var(--primary);
+    color: #000;
+}
+
+/* ── Animated Background ── */
+.bg-effects {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.bg-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.4;
+    animation: orbFloat 20s ease-in-out infinite;
+}
+
+.orb-1 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.3), transparent 70%);
+    top: -10%;
+    left: -5%;
+    animation-duration: 25s;
+}
+
+.orb-2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.25), transparent 70%);
+    bottom: -15%;
+    right: -5%;
+    animation-duration: 20s;
+    animation-delay: -7s;
+}
+
+.orb-3 {
+    width: 350px;
+    height: 350px;
+    background: radial-gradient(circle, rgba(74, 222, 128, 0.15), transparent 70%);
+    top: 40%;
+    left: 50%;
+    animation-duration: 30s;
+    animation-delay: -12s;
+}
+
+@keyframes orbFloat {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
     }
-    if (name === 'form') $('nav-nuevo').classList.add('active');
 
-    // Close mobile sidebar
-    $('sidebar').classList.remove('open');
-    $('sidebar-overlay').classList.add('hidden');
-}
-
-// Sidebar nav clicks
-$('nav-clientes').addEventListener('click', () => { currentNavFilter = 'all'; showScreen('list'); renderProfiles(); });
-$('nav-vigentes').addEventListener('click', () => { currentNavFilter = 'vigentes'; showScreen('list'); renderProfiles(); });
-$('nav-vencidos').addEventListener('click', () => { currentNavFilter = 'vencidos'; showScreen('list'); renderProfiles(); });
-$('nav-nuevo').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
-$('btn-new-top').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
-
-// Mobile menu
-$('menu-toggle').addEventListener('click', () => {
-    $('sidebar').classList.toggle('open');
-    $('sidebar-overlay').classList.toggle('hidden');
-});
-$('sidebar-overlay').addEventListener('click', () => {
-    $('sidebar').classList.remove('open');
-    $('sidebar-overlay').classList.add('hidden');
-});
-
-// Keyboard shortcut
-document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        if (currentScreen === 'list') $('search-profiles').focus();
+    25% {
+        transform: translate(40px, -50px) scale(1.1);
     }
-});
 
-// ═══════════════════════════════════════════════
-// UTILITIES
-// ═══════════════════════════════════════════════
-function parseFecha(val) {
-    if (!val) return null;
-    if (val.toDate) return val.toDate();
-    if (typeof val === 'string') {
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? null : d;
+    50% {
+        transform: translate(-30px, 30px) scale(0.95);
     }
-    return null;
+
+    75% {
+        transform: translate(20px, 50px) scale(1.05);
+    }
 }
 
-function formatDate(d) {
-    if (!d) return 'N/A';
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+.bg-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
 }
 
-function toISODate(d) {
-    if (!d) return '';
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════════════ */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    background: rgba(12, 18, 37, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 500;
+    transition: transform var(--transition);
 }
 
-function phoneFormat(raw) {
-    let digits = raw.replace(/\D/g, '');
-    if (digits.startsWith('51') && digits.length > 2) digits = digits.substring(2);
-    let out = '+51';
-    if (digits.length > 0) {
-        out += ' ';
-        for (let i = 0; i < digits.length && out.length < 15; i++) {
-            if (i > 0 && i % 3 === 0) out += ' ';
-            out += digits[i];
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 28px 24px 24px;
+}
+
+.brand-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    object-fit: cover;
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15);
+}
+
+.brand-name {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+}
+
+.brand-tag {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sidebar-nav {
+    padding: 12px 16px;
+    flex: 1;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    margin-bottom: 4px;
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+.nav-item.active {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.nav-item .material-icons-round {
+    font-size: 20px;
+}
+
+.sidebar-stats {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.stat-icon {
+    font-size: 22px;
+    color: var(--primary);
+}
+
+.stat-icon.warning {
+    color: var(--warning);
+}
+
+.stat-number {
+    display: block;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.stat-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.sidebar-footer {
+    padding: 18px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--secondary);
+    font-weight: 500;
+}
+
+.sidebar-footer .material-icons-round {
+    font-size: 16px;
+}
+
+/* ═══════════════════════════════════════════════
+   MOBILE HEADER
+   ═══════════════════════════════════════════════ */
+.mobile-header {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(12, 18, 37, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 400;
+}
+
+.menu-toggle {
+    background: none;
+    border: none;
+    color: var(--text);
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-logo-sm {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.mobile-brand h2 {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.badge {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 450;
+    backdrop-filter: blur(4px);
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN CONTENT
+   ═══════════════════════════════════════════════ */
+.main-content {
+    margin-left: var(--sidebar-w);
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Screens ── */
+.screen {
+    display: none;
+    flex-direction: column;
+    padding: 32px 40px;
+    animation: screenIn 0.4s ease;
+    min-height: 100vh;
+}
+
+.screen.active {
+    display: flex;
+}
+
+#screen-form {
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+#screen-form .page-header {
+    display: none;
+}
+
+@keyframes screenIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Page Header ── */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.page-title {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.page-subtitle {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 4px;
+}
+
+.detail-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.detail-client-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.detail-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-avatar .material-icons-round {
+    font-size: 24px;
+    color: #fff;
+}
+
+.detail-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ── Buttons ── */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--primary), #0EA5E9);
+    border: none;
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 6px 24px var(--primary-glow);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    transform: scale(0.97);
+}
+
+.btn-primary .material-icons-round {
+    font-size: 18px;
+}
+
+.btn-primary.lg {
+    padding: 14px 28px;
+    font-size: 15px;
+    border-radius: var(--radius-lg);
+}
+
+.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--text);
+}
+
+.btn-ghost .material-icons-round {
+    font-size: 18px;
+}
+
+.btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--danger);
+    border: none;
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-danger:hover {
+    box-shadow: 0 4px 16px rgba(248, 113, 113, 0.35);
+}
+
+.btn-danger .material-icons-round {
+    font-size: 18px;
+}
+
+.danger-ghost {
+    border-color: transparent;
+    padding: 8px;
+}
+
+.danger-ghost:hover {
+    background: var(--danger-dim);
+    color: var(--danger);
+}
+
+/* ── Search Box ── */
+.toolbar {
+    margin-bottom: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.custom-dropdown {
+    position: relative;
+    width: 220px;
+    z-index: 100;
+}
+
+.dropdown-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    height: 48px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.dropdown-header:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.dropdown-header span:nth-child(2) {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dropdown-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-list.hidden {
+    display: none;
+}
+
+.dropdown-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all var(--transition);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+
+.dropdown-item.active {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* ── Service Table ── */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    animation: screenIn 0.4s ease;
+}
+
+.table-container.hidden {
+    display: none;
+}
+
+.service-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.service-table th {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 16px 20px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+}
+
+.service-table td {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+}
+
+.service-table tbody tr {
+    animation: slideDown 0.3s ease forwards;
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+@keyframes slideDown {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.service-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.service-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0 18px;
+    height: 48px;
+    max-width: 500px;
+    transition: all var(--transition);
+}
+
+.search-box:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-dim);
+}
+
+.search-box .material-icons-round {
+    font-size: 20px;
+    color: var(--text-dim);
+}
+
+.search-box:focus-within .material-icons-round {
+    color: var(--primary);
+}
+
+.search-box input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    min-width: 0;
+}
+
+.search-box input::placeholder {
+    color: var(--text-muted);
+}
+
+.search-hint {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.search-box.compact {
+    max-width: 240px;
+    height: 40px;
+}
+
+/* ═══════════════════════════════════════════════
+   PROFILES GRID (SCREEN 1)
+   ═══════════════════════════════════════════════ */
+.profiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.profile-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.profile-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--primary-dim), transparent 60%);
+    opacity: 0;
+    transition: opacity var(--transition);
+}
+
+.profile-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.profile-card:hover::before {
+    opacity: 1;
+}
+
+.profile-card:active {
+    transform: scale(0.985);
+}
+
+.profile-avatar {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+}
+
+.profile-avatar .material-icons-round {
+    font-size: 24px;
+    color: #fff;
+}
+
+.profile-info {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.profile-number {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+.profile-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.profile-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 4px;
+}
+
+.profile-badge.green {
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ADE80;
+}
+
+.profile-badge.yellow {
+    background: rgba(251, 191, 36, 0.12);
+    color: #FBBF24;
+}
+
+.profile-badge.red {
+    background: rgba(248, 113, 113, 0.12);
+    color: #F87171;
+}
+
+.profile-arrow {
+    position: relative;
+    z-index: 1;
+}
+
+.profile-arrow .material-icons-round {
+    font-size: 18px;
+    color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════
+   PURCHASES GRID (SCREEN 2)
+   ═══════════════════════════════════════════════ */
+.purchases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+}
+
+.purchase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    transition: all var(--transition);
+    animation: cardPop 0.4s ease both;
+}
+
+@keyframes cardPop {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.purchase-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.card-top {
+    padding: 24px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-top-left h3 {
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary), #7DD3FC);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.card-top-left span {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.days-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.days-badge small {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.days-green {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ADE80;
+    border: 1.5px solid rgba(74, 222, 128, 0.25);
+}
+
+.days-yellow {
+    background: rgba(251, 191, 36, 0.1);
+    color: #FBBF24;
+    border: 1.5px solid rgba(251, 191, 36, 0.25);
+}
+
+.days-red {
+    background: rgba(248, 113, 113, 0.1);
+    color: #F87171;
+    border: 1.5px solid rgba(248, 113, 113, 0.25);
+}
+
+.card-body {
+    padding: 20px 24px;
+}
+
+.card-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 20px;
+    margin-top: 16px;
+}
+
+.info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.info-item .material-icons-round {
+    font-size: 18px;
+    color: var(--primary);
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+.info-item.full {
+    grid-column: 1 / -1;
+}
+
+.info-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 14px;
+    font-weight: 600;
+    word-break: break-all;
+    margin-top: 1px;
+}
+
+.info-value.accent {
+    font-weight: 800;
+}
+
+.card-footer {
+    padding: 16px 24px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.card-footer-left {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border: none;
+    transition: all var(--transition);
+}
+
+.btn-card:active {
+    transform: scale(0.94);
+}
+
+.btn-card.edit {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text);
+}
+
+.btn-card.edit:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-card.delete {
+    background: var(--danger-dim);
+    color: var(--danger);
+}
+
+.btn-card.delete:hover {
+    background: rgba(248, 113, 113, 0.2);
+}
+
+.btn-card.share {
+    background: linear-gradient(135deg, var(--whatsapp), var(--whatsapp-dark));
+    color: #fff;
+    padding: 8px 20px;
+}
+
+.btn-card.share:hover {
+    box-shadow: 0 4px 16px rgba(37, 211, 102, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-card .material-icons-round {
+    font-size: 16px;
+}
+
+/* ═══════════════════════════════════════════════
+   FORM (SCREEN 3)
+   ═══════════════════════════════════════════════ */
+.form-container {
+    max-width: 680px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.form-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+}
+
+.form-card-header {
+    padding: 36px 32px 28px;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.06) 0%, transparent 100%);
+    border-bottom: 1px solid var(--border);
+}
+
+.form-logo-wrap {
+    width: 80px;
+    height: 80px;
+    border-radius: 24px;
+    overflow: hidden;
+    margin: 0 auto 18px;
+    box-shadow: 0 8px 30px rgba(56, 189, 248, 0.15);
+    border: 2px solid rgba(56, 189, 248, 0.2);
+}
+
+.form-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.form-card-header h2 {
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.form-card-header p {
+    font-size: 14px;
+    color: var(--text-dim);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    padding: 28px 32px 0;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group.full {
+    grid-column: 1 / -1;
+}
+
+.form-group.half {
+    grid-column: span 1;
+}
+
+.form-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.form-group label .material-icons-round {
+    font-size: 16px;
+    color: var(--primary);
+}
+
+.form-group input {
+    height: 48px;
+    padding: 0 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+    transition: all var(--transition);
+}
+
+.form-group input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-dim);
+}
+
+.form-group input::placeholder {
+    color: var(--text-muted);
+}
+
+.date-input {
+    color-scheme: dark;
+}
+
+.form-section {
+    padding: 20px 32px 0;
+}
+
+.form-section h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 14px;
+}
+
+.form-actions {
+    padding: 28px 32px 32px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.form-sections-row {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0;
+    padding: 0;
+}
+
+.form-sections-row .form-section {
+    padding: 14px 32px 10px;
+}
+
+/* ── Chips ── */
+.chips-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.chip {
+    height: 44px;
+    min-width: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.chip:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text);
+}
+
+.chip:active {
+    transform: scale(0.94);
+}
+
+.chip.circle {
+    width: 44px;
+    padding: 0;
+    border-radius: 50%;
+}
+
+.chip.selected {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #000;
+    font-weight: 800;
+    box-shadow: 0 4px 14px var(--primary-glow);
+}
+
+/* ═══════════════════════════════════════════════
+   MODALS
+   ═══════════════════════════════════════════════ */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-panel {
+    position: relative;
+    width: calc(100% - 32px);
+    max-width: 520px;
+    max-height: 90vh;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: panelIn 0.3s ease;
+}
+
+.modal-panel.sm {
+    max-width: 400px;
+}
+
+@keyframes panelIn {
+    from {
+        transform: scale(0.95) translateY(10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    flex: 1;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+
+.modal-icon-danger {
+    font-size: 24px;
+    color: var(--danger);
+}
+
+.modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body .form-grid {
+    padding: 0;
+}
+
+.modal-body .form-section {
+    padding: 16px 0 0;
+}
+
+.confirm-text {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* ── Options List ── */
+.options-list {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.option-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 14px 16px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.option-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.option-btn .material-icons-round {
+    font-size: 22px;
+    color: var(--primary);
+}
+
+.option-btn strong {
+    display: block;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.option-btn small {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.option-btn.danger .material-icons-round {
+    color: var(--danger);
+}
+
+.option-btn.danger strong {
+    color: var(--danger);
+}
+
+.option-btn.danger:hover {
+    background: var(--danger-dim);
+}
+
+/* ═══════════════════════════════════════════════
+   TOAST
+   ═══════════════════════════════════════════════ */
+.toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 22px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    animation: slideUpToast 0.35s ease;
+    white-space: nowrap;
+}
+
+@keyframes slideUpToast {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 16px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+.toast-icon {
+    color: var(--secondary);
+    font-size: 20px;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ═══════════════════════════════════════════════
+   STATES
+   ═══════════════════════════════════════════════ */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 80px 0;
+    grid-column: 1 / -1;
+    color: var(--text-dim);
+    font-size: 14px;
+}
+
+.spinner-ring {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(56, 189, 248, 0.15);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 80px 20px;
+}
+
+.empty-state .material-icons-round {
+    font-size: 56px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.empty-state p {
+    font-size: 16px;
+    color: var(--text-dim);
+}
+
+.empty-state small {
+    font-size: 13px;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 6px;
+}
+
+/* ═══════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════ */
+.hidden {
+    display: none !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .mobile-header {
+        display: flex;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding-top: 60px;
+    }
+
+    .screen {
+        padding: 20px 16px;
+    }
+
+    .profiles-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .purchases-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-header {
+        flex-direction: column;
+    }
+
+    .detail-header-right {
+        width: 100%;
+    }
+
+    .search-box {
+        max-width: 100%;
+    }
+
+    .search-box.compact {
+        max-width: 100%;
+    }
+
+    .search-hint {
+        display: none;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .toast {
+        bottom: 16px;
+        max-width: calc(100% - 32px);
+        white-space: normal;
+        text-align: center;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .form-card-header {
+        padding: 24px 20px 20px;
+    }
+
+    .form-grid {
+        padding: 20px 20px 0;
+    }
+
+    .form-section {
+        padding: 16px 20px 0;
+    }
+
+    .form-actions {
+        padding: 24px 20px;
+    }
+
+    .card-top,
+    .card-body,
+    .card-footer {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+}
+
+/* ═══════════════════════════════════════════════
+   BOT FAB & EXPIRING
+   ═══════════════════════════════════════════════ */
+.fab-container {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 900;
+}
+
+@media (max-width: 640px) {
+    .fab-container {
+        right: 50%;
+        transform: translateX(50%);
+    }
+}
+
+.fab-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    box-shadow: 0 6px 16px var(--primary-glow);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.fab-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px var(--primary-glow);
+}
+
+.fab-btn .material-icons-round {
+    font-size: 28px;
+}
+
+.fab-menu {
+    position: absolute;
+    bottom: 70px;
+    right: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: slideUp 0.25s ease-out;
+    min-width: 200px;
+}
+
+@media (max-width: 640px) {
+    .fab-menu {
+        right: 50%;
+        transform: translateX(50%);
+        bottom: 70px;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translate(-50%, 10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(-50%, 0);
         }
     }
-    return out;
 }
 
-function escapeHtml(str) {
-    if (!str) return '';
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-}
-
-function toast(msg) {
-    const t = $('toast');
-    $('toast-text').textContent = msg;
-    t.classList.remove('hidden');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => t.classList.add('hidden'), 3500);
-}
-
-function getDaysInfo(fechaOrden) {
-    const fC = parseFecha(fechaOrden);
-    const fCStr = formatDate(fC);
-    const fV = fC ? new Date(fC.getTime() + 31 * 24 * 60 * 60 * 1000) : null;
-    const fVStr = formatDate(fV);
-    const diasRaw = fV ? Math.floor((fV.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
-    const dias = diasRaw < 0 ? 0 : diasRaw;
-    const colorClass = dias >= 5 ? 'days-green' : (dias >= 2 ? 'days-yellow' : 'days-red');
-    const colorHex = dias >= 5 ? '#4ADE80' : (dias >= 2 ? '#FBBF24' : '#F87171');
-    const badgeClass = dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red');
-    return { fC, fCStr, fV, fVStr, dias, diasRaw, colorClass, colorHex, badgeClass };
-}
-
-// ═══════════════════════════════════════════════
-// SCREEN 1: PROFILE LIST
-// ═══════════════════════════════════════════════
-let unsubProfiles = null;
-let unsubClients = null;
-let profilesData = [];
-let clientsData = [];
-
-function initProfileList() {
-    unsubProfiles = db.collection('perfiles').orderBy('ultima_actividad', 'desc').onSnapshot(snap => {
-        profilesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderProfiles();
-    });
-
-    unsubClients = db.collection('clientes').onSnapshot(snap => {
-        clientsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        allClientsCache = clientsData;
-        updateStats();
-        renderProfiles();
-    });
-
-    $('search-profiles').addEventListener('input', () => renderProfiles());
-}
-
-function updateStats() {
-    const totalProfiles = new Set([
-        ...profilesData.map(p => p.numero),
-        ...clientsData.map(c => c.numero_cliente)
-    ].filter(Boolean)).size;
-
-    let expiring = 0;
-    clientsData.forEach(c => {
-        const { diasRaw } = getDaysInfo(c.fecha_orden);
-        if (diasRaw >= 0 && diasRaw <= 2) expiring++;
-    });
-
-    $('stat-total').textContent = totalProfiles;
-    $('stat-expiring').textContent = expiring;
-    $('mobile-stat-total').textContent = totalProfiles;
-}
-
-function renderProfiles() {
-    const grid = $('profiles-grid');
-    const tableContainer = $('service-table-container');
-    const tbody = $('service-table-body');
-    const filter = ($('search-profiles').value || '').toLowerCase();
-
-    const clientNums = new Set(clientsData.map(c => c.numero_cliente).filter(Boolean));
-    const profileNums = new Set(profilesData.map(p => p.numero).filter(Boolean));
-    let allNumbers = [...new Set([...clientNums, ...profileNums])];
-
-    // Sort by profile activity
-    const profileOrder = profilesData.map(p => p.numero);
-    allNumbers.sort((a, b) => {
-        const ia = profileOrder.indexOf(a); const ib = profileOrder.indexOf(b);
-        return (ia === -1 ? 9999 : ia) - (ib === -1 ? 9999 : ib);
-    });
-
-    if (filter) {
-        allNumbers = allNumbers.filter(num => {
-            if (num.toLowerCase().includes(filter)) return true;
-            if (clientsData.some(c => c.numero_cliente === num && (c.correo || '').toLowerCase().includes(filter))) return true;
-            if (clientsData.some(c => c.numero_cliente === num && (c.tipo_cuenta || '').toLowerCase().includes(filter))) return true;
-            const prof = profilesData.find(p => p.numero === num);
-            if (prof && (prof.search_emails || '').toLowerCase().includes(filter)) return true;
-            return false;
-        });
-    }
-
-    if (botFilterActive) {
-        allNumbers = allNumbers.filter(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-            return clientAccounts.some(c => {
-                const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw >= 0 && diasRaw <= 2;
-            });
-        });
-    }
-
-    if (currentNavFilter === 'vigentes') {
-        allNumbers = allNumbers.filter(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-            if (clientAccounts.length === 0) return false;
-            return clientAccounts.some(c => {
-                const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw >= 0;
-            });
-        });
-    } else if (currentNavFilter === 'vencidos') {
-        allNumbers = allNumbers.filter(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-            if (clientAccounts.length === 0) return false;
-            return clientAccounts.every(c => {
-                const { diasRaw } = getDaysInfo(c.fecha_orden);
-                return diasRaw < 0;
-            });
-        });
-    }
-
-    if (activeServiceFilter) {
-        grid.classList.add('hidden');
-        if (tableContainer) tableContainer.classList.remove('hidden');
-
-        let filteredAccounts = [];
-        allNumbers.forEach(num => {
-            const clientAccounts = clientsData.filter(c => c.numero_cliente === num && c.tipo_cuenta === activeServiceFilter);
-            filteredAccounts.push(...clientAccounts);
-        });
-
-        if (filteredAccounts.length === 0) {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron cuentas de ${activeServiceFilter}</td></tr>`;
-        } else {
-            filteredAccounts.sort((a, b) => {
-                const da = getDaysInfo(a.fecha_orden).diasRaw;
-                const db = getDaysInfo(b.fecha_orden).diasRaw;
-                return da - db;
-            });
-
-            if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
-                const { fCStr, fVStr, dias, colorHex } = getDaysInfo(acc.fecha_orden);
-                return `
-                <tr style="animation-delay: ${idx * 0.05}s">
-                    <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
-                    <td>${escapeHtml(acc.correo || 'N/A')}</td>
-                    <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
-                    <td>${fCStr}</td>
-                    <td style="color: ${colorHex}; font-weight: 600;">${fVStr}</td>
-                    <td>
-                        <span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">
-                            ${dias}d
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn-primary" style="padding: 6px 12px; font-size: 11px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
-                            <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
-                        </button>
-                    </td>
-                </tr>`;
-            }).join('');
-        }
-        return;
-    } else {
-        grid.classList.remove('hidden');
-        if (tableContainer) tableContainer.classList.add('hidden');
-    }
-
-    if (allNumbers.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <span class="material-icons-round">group_off</span>
-                <p>${filter ? 'No se encontraron resultados' : 'Sin registros'}</p>
-                <small>${filter ? 'Intenta con otro término de búsqueda' : 'Agrega tu primer cliente con el botón "Nuevo Registro"'}</small>
-            </div>`;
-        return;
-    }
-
-    grid.innerHTML = allNumbers.map(num => {
-        // Build a mini summary for this profile
-        const clientAccounts = clientsData.filter(c => c.numero_cliente === num);
-        const accountCount = clientAccounts.length;
-        const services = [...new Set(clientAccounts.map(c => c.tipo_cuenta).filter(Boolean))];
-
-        // Find nearest expiration
-        let minDays = Infinity;
-        clientAccounts.forEach(c => {
-            const { dias } = getDaysInfo(c.fecha_orden);
-            if (dias < minDays) minDays = dias;
-        });
-
-        const badgeClass = minDays >= 5 ? 'green' : (minDays >= 2 ? 'yellow' : 'red');
-        const badgeHtml = accountCount > 0 && minDays < Infinity
-            ? `<span class="profile-badge ${badgeClass}">${minDays}d</span>`
-            : '';
-
-        return `
-        <div class="profile-card" data-number="${escapeHtml(num)}">
-            <div class="profile-avatar">
-                <span class="material-icons-round">person</span>
-            </div>
-            <div class="profile-info">
-                <div class="profile-number">${escapeHtml(num)}</div>
-                <div class="profile-sub">
-                    ${accountCount} cuenta${accountCount !== 1 ? 's' : ''}
-                    ${services.length ? ' · ' + services.slice(0, 3).join(', ') : ''}
-                    ${badgeHtml}
-                </div>
-            </div>
-            <div class="profile-arrow">
-                <span class="material-icons-round">chevron_right</span>
-            </div>
-        </div>`;
-    }).join('');
-
-    // Bind events
-    grid.querySelectorAll('.profile-card').forEach(card => {
-        const num = card.dataset.number;
-        card.addEventListener('click', () => openClientDetail(num));
-
-        let pressTimer;
-        card.addEventListener('contextmenu', e => { e.preventDefault(); openProfileOptions(num); });
-        card.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openProfileOptions(num), 600); });
-        card.addEventListener('mouseup', () => clearTimeout(pressTimer));
-        card.addEventListener('mouseleave', () => clearTimeout(pressTimer));
-        card.addEventListener('touchstart', () => { pressTimer = setTimeout(() => openProfileOptions(num), 600); }, { passive: true });
-        card.addEventListener('touchend', () => clearTimeout(pressTimer));
-    });
-}
-
-// ── Profile Options ──
-function openProfileOptions(num) {
-    optionsTargetNumber = num;
-    $('modal-options').classList.remove('hidden');
-}
-
-// Close options
-['options-close-x'].forEach(id => $(id).addEventListener('click', () => $('modal-options').classList.add('hidden')));
-$('modal-options').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-options').classList.add('hidden'));
-
-$('opt-edit-number').addEventListener('click', () => {
-    $('modal-options').classList.add('hidden');
-    $('edit-number-input').value = optionsTargetNumber;
-    $('modal-edit-number').classList.remove('hidden');
-});
-
-$('opt-delete-user').addEventListener('click', () => {
-    $('modal-options').classList.add('hidden');
-    $('confirm-delete-text').textContent = `¿Estás seguro de que deseas eliminar al usuario ${optionsTargetNumber} y todos sus registros? Esta acción no se puede deshacer.`;
-    $('modal-confirm-delete').classList.remove('hidden');
-});
-
-// Edit number modal
-$('edit-number-cancel').addEventListener('click', () => $('modal-edit-number').classList.add('hidden'));
-$('editnum-close-x').addEventListener('click', () => $('modal-edit-number').classList.add('hidden'));
-$('modal-edit-number').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-edit-number').classList.add('hidden'));
-
-$('edit-number-save').addEventListener('click', async () => {
-    const newNum = $('edit-number-input').value.trim();
-    const oldNum = optionsTargetNumber;
-    if (!newNum || newNum === oldNum) { $('modal-edit-number').classList.add('hidden'); return; }
-    try {
-        const batch = db.batch();
-        batch.delete(db.collection('perfiles').doc(oldNum));
-        batch.set(db.collection('perfiles').doc(newNum), { numero: newNum, ultima_actividad: firebase.firestore.FieldValue.serverTimestamp() });
-        const snap = await db.collection('clientes').where('numero_cliente', '==', oldNum).get();
-        snap.docs.forEach(d => batch.update(d.ref, { numero_cliente: newNum }));
-        await batch.commit();
-        toast('Número actualizado correctamente');
-    } catch (e) { toast('Error: ' + e.message); }
-    $('modal-edit-number').classList.add('hidden');
-});
-
-// Confirm delete user
-$('confirm-delete-cancel').addEventListener('click', () => $('modal-confirm-delete').classList.add('hidden'));
-$('confirm-close-x').addEventListener('click', () => $('modal-confirm-delete').classList.add('hidden'));
-$('modal-confirm-delete').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-confirm-delete').classList.add('hidden'));
-
-$('confirm-delete-ok').addEventListener('click', async () => {
-    const num = optionsTargetNumber;
-    try {
-        const batch = db.batch();
-        batch.delete(db.collection('perfiles').doc(num));
-        const snap = await db.collection('clientes').where('numero_cliente', '==', num).get();
-        snap.docs.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        toast('Cliente eliminado');
-        // If we were viewing this client, go back
-        if (currentProfileNumber === num) showScreen('list');
-    } catch (e) { toast('Error: ' + e.message); }
-    $('modal-confirm-delete').classList.add('hidden');
-});
-
-// ═══════════════════════════════════════════════
-// SCREEN 2: CLIENT DETAIL
-// ═══════════════════════════════════════════════
-let unsubPurchases = null;
-let currentPurchaseDocs = [];
-
-function openClientDetail(numero) {
-    currentProfileNumber = numero;
-    $('detail-title').textContent = '+' + numero.replace(/^\+/, '');
-    showScreen('detail');
-
-    $('purchases-grid').innerHTML = '<div class="loading-state"><div class="spinner-ring"></div><p>Cargando cuentas...</p></div>';
-
-    if (unsubPurchases) unsubPurchases();
-    unsubPurchases = db.collection('clientes').where('numero_cliente', '==', numero).onSnapshot(snap => {
-        currentPurchaseDocs = snap.docs;
-        $('detail-count').textContent = `${snap.docs.length} cuenta${snap.docs.length !== 1 ? 's' : ''} registrada${snap.docs.length !== 1 ? 's' : ''}`;
-        renderPurchases(snap.docs);
-    });
-}
-
-function renderPurchases(docs) {
-    const grid = $('purchases-grid');
-    const filter = ($('search-detail').value || '').toLowerCase();
-
-    if (docs.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <span class="material-icons-round">inbox</span>
-                <p>Sin cuentas registradas</p>
-                <small>Agrega una cuenta con el botón "Agregar Cuenta"</small>
-            </div>`;
-        return;
-    }
-
-    let sorted = [...docs].sort((a, b) => {
-        const t1 = parseFecha(a.data().fecha_orden);
-        const t2 = parseFecha(b.data().fecha_orden);
-        return (t2 || new Date()).getTime() - (t1 || new Date()).getTime();
-    });
-
-    if (filter) {
-        sorted = sorted.filter(d => (d.data().correo || '').toLowerCase().includes(filter));
-    }
-
-    if (sorted.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <span class="material-icons-round">search_off</span>
-                <p>Sin resultados</p>
-            </div>`;
-        return;
-    }
-
-    grid.innerHTML = sorted.map((doc, idx) => {
-        const data = doc.data();
-        const { fCStr, fVStr, dias, colorClass, colorHex } = getDaysInfo(data.fecha_orden);
-
-        return `
-        <div class="purchase-card" style="animation-delay:${idx * 0.07}s">
-            <div class="card-top">
-                <div class="card-top-left">
-                    <h3>${escapeHtml(data.tipo_cuenta || 'Servicio')}</h3>
-                    <span>${escapeHtml(data.usuario || 'Master')}</span>
-                </div>
-                <div class="days-badge ${colorClass}">
-                    ${dias}
-                    <small>días</small>
-                </div>
-            </div>
-            <div class="card-body">
-                <hr class="card-divider">
-                <div class="info-grid">
-                    <div class="info-item full">
-                        <span class="material-icons-round">alternate_email</span>
-                        <div><div class="info-label">Correo</div><div class="info-value">${escapeHtml(data.correo || 'N/A')}</div></div>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons-round">key</span>
-                        <div><div class="info-label">Contraseña</div><div class="info-value">${escapeHtml(data.contrasena || 'N/A')}</div></div>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons-round">person</span>
-                        <div><div class="info-label">Perfil</div><div class="info-value">${escapeHtml(data.perfil || 'N/A')}</div></div>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons-round">lock</span>
-                        <div><div class="info-label">PIN</div><div class="info-value">${escapeHtml(data.pin || 'N/A')}</div></div>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons-round">shopping_bag</span>
-                        <div><div class="info-label">Compra</div><div class="info-value">${fCStr}</div></div>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons-round" style="color:${colorHex}">event</span>
-                        <div><div class="info-label">Vence</div><div class="info-value accent" style="color:${colorHex}">${fVStr}</div></div>
-                    </div>
-                </div>
-            </div>
-            <div class="card-footer">
-                <div class="card-footer-left">
-                    <button class="btn-card edit" data-docid="${doc.id}">
-                        <span class="material-icons-round">edit_note</span>
-                        Editar
-                    </button>
-                    <button class="btn-card delete" data-docid="${doc.id}">
-                        <span class="material-icons-round">close</span>
-                    </button>
-                </div>
-                <button class="btn-card share" data-docid="${doc.id}">
-                    <span class="material-icons-round">send</span>
-                    WhatsApp
-                </button>
-            </div>
-        </div>`;
-    }).join('');
-
-    // Bind actions
-    grid.querySelectorAll('.btn-card.edit').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const d = docs.find(x => x.id === btn.dataset.docid);
-            if (d) openEditModal(d.id, d.data());
-        });
-    });
-
-    grid.querySelectorAll('.btn-card.delete').forEach(btn => {
-        btn.addEventListener('click', () => deletePurchase(btn.dataset.docid));
-    });
-
-    grid.querySelectorAll('.btn-card.share').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const d = docs.find(x => x.id === btn.dataset.docid);
-            if (d) shareWhatsApp(d.data());
-        });
-    });
-}
-
-// Detail search
-$('search-detail').addEventListener('input', () => {
-    renderPurchases(currentPurchaseDocs);
-});
-
-// Back from detail
-$('btn-back-detail').addEventListener('click', () => {
-    if (unsubPurchases) { unsubPurchases(); unsubPurchases = null; }
-    $('search-detail').value = '';
-    currentPurchaseDocs = [];
-    showScreen('list');
-});
-
-// Client options button (in detail header)
-$('btn-client-options').addEventListener('click', () => {
-    openProfileOptions(currentProfileNumber);
-});
-
-// Add to this client
-$('btn-add-to-client').addEventListener('click', () => {
-    openForm(currentProfileNumber);
-});
-
-// ── Edit Modal ──
-function openEditModal(docId, data) {
-    editDocId = docId;
-    $('edit-numero').value = data.numero_cliente || '';
-    $('edit-correo').value = data.correo || '';
-    $('edit-pass').value = data.contrasena || '';
-    $('edit-pin').value = data.pin || '';
-
-    const fC = parseFecha(data.fecha_orden);
-    $('edit-fecha').value = fC ? toISODate(fC) : toISODate(new Date());
-
-    editState = {
-        servicio: data.tipo_cuenta || 'Netflix',
-        perfil: data.perfil || '1',
-        tipo: data.usuario || 'Master'
-    };
-
-    renderEditChips();
-    $('modal-edit').classList.remove('hidden');
-}
-
-function renderEditChips() {
-    $('edit-chips-servicio').innerHTML = servicios.map(s =>
-        `<div class="chip ${editState.servicio === s ? 'selected' : ''}" data-val="${s}">${s}</div>`
-    ).join('');
-    $('edit-chips-servicio').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { editState.servicio = c.dataset.val; renderEditChips(); });
-    });
-
-    $('edit-chips-perfil').innerHTML = [1, 2, 3, 4, 5, 6].map(p =>
-        `<div class="chip circle ${editState.perfil === String(p) ? 'selected' : ''}" data-val="${p}">${p}</div>`
-    ).join('');
-    $('edit-chips-perfil').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { editState.perfil = c.dataset.val; renderEditChips(); });
-    });
-
-    $('edit-chips-tipo').innerHTML = ['Master', 'No Master'].map(t =>
-        `<div class="chip ${editState.tipo === t ? 'selected' : ''}" data-val="${t}">${t}</div>`
-    ).join('');
-    $('edit-chips-tipo').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { editState.tipo = c.dataset.val; renderEditChips(); });
-    });
-}
-
-$('edit-cancel').addEventListener('click', () => $('modal-edit').classList.add('hidden'));
-$('edit-close-x').addEventListener('click', () => $('modal-edit').classList.add('hidden'));
-$('modal-edit').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-edit').classList.add('hidden'));
-
-$('edit-save').addEventListener('click', async () => {
-    try {
-        const fechaVal = $('edit-fecha').value;
-        const fechaDate = fechaVal ? new Date(fechaVal + 'T00:00:00') : new Date();
-        const nuevoNumero = $('edit-numero').value.trim();
-
-        await db.collection('clientes').doc(editDocId).update({
-            numero_cliente: nuevoNumero,
-            correo: $('edit-correo').value,
-            contrasena: $('edit-pass').value,
-            pin: $('edit-pin').value,
-            tipo_cuenta: editState.servicio,
-            perfil: editState.perfil,
-            usuario: editState.tipo,
-            fecha_orden: firebase.firestore.Timestamp.fromDate(fechaDate)
-        });
-
-        // Ensure the profile exists if the number changed or was typed
-        if (nuevoNumero) {
-            await db.collection('perfiles').doc(nuevoNumero).set({
-                numero: nuevoNumero,
-                ultima_actividad: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            await updateProfileSearchData(nuevoNumero);
+@media (min-width: 641px) {
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
         }
 
-        // If the number was changed, update the old profile's search data too
-        if (nuevoNumero !== currentProfileNumber) {
-            await updateProfileSearchData(currentProfileNumber);
+        to {
+            opacity: 1;
+            transform: translateY(0);
         }
-
-        toast('Registro actualizado');
-    } catch (e) { toast('Error: ' + e.message); }
-    $('modal-edit').classList.add('hidden');
-});
-
-// ── Delete purchase ──
-async function deletePurchase(docId) {
-    if (!confirm('¿Eliminar esta compra? Esta acción no se puede deshacer.')) return;
-    try {
-        await db.collection('clientes').doc(docId).delete();
-        await updateProfileSearchData(currentProfileNumber);
-        toast('Compra eliminada');
-    } catch (e) { toast('Error: ' + e.message); }
-}
-
-// ── WhatsApp ──
-function shareWhatsApp(data) {
-    const { fCStr, fVStr, dias } = getDaysInfo(data.fecha_orden);
-
-    // Construimos el mensaje usando concatenación y \n explícitos para mayor compatibilidad
-    let msg = "\u00A1Hola! Detalles de tu cuenta:\n\n";
-    msg += "\uD83D\uDCFA *Servicio:* " + (data.tipo_cuenta || "") + "\n";
-    msg += "\u2B50 *Usuario:* " + (data.correo || "") + "\n";
-    msg += "\uD83D\uDD12 *Contraseña:* " + (data.contrasena || "") + "\n\n";
-    msg += "\uD83D\uDC64 *Perfil:* " + (data.perfil || "") + "\n";
-    msg += "\uD83D\uDD22 *PIN:* " + (data.pin || "") + "\n";
-    msg += "\u2705 *Tipo:* " + (data.usuario || "") + "\n\n";
-    msg += "\uD83D\uDCC5 *Compra:* " + fCStr + "\n";
-    msg += "\uD83D\uDCC6 *Vence:* " + fVStr + "\n";
-    msg += "\u23F3 *Quedan:* " + dias + " d\u00EDas\n\n";
-    msg += "Gracias! \u2728";
-
-    // Limpiamos el número de teléfono para que solo queden dígitos
-    const phone = currentProfileNumber.replace(/\D/g, '');
-
-    // Usamos api.whatsapp.com que suele ser más estable en navegadores antiguos o específicos
-    const url = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
-
-    window.open(url, '_blank');
-}
-
-// ═══════════════════════════════════════════════
-// SCREEN 3: FORM
-// ═══════════════════════════════════════════════
-let formState = { perfil: '1', tipo: 'Master', servicio: 'Netflix' };
-
-function openForm(prefilledNumber) {
-    $('form-numero').value = prefilledNumber || '';
-    $('form-correo').value = '';
-    $('form-pass').value = '';
-    $('form-pin').value = '';
-    formState = { perfil: '1', tipo: 'Master', servicio: 'Netflix' };
-
-    $('field-numero').style.display = prefilledNumber ? 'none' : '';
-    renderFormChips();
-    showScreen('form');
-}
-
-function renderFormChips() {
-    $('chips-perfil').innerHTML = [1, 2, 3, 4, 5, 6].map(p =>
-        `<div class="chip circle ${formState.perfil === String(p) ? 'selected' : ''}" data-val="${p}">${p}</div>`
-    ).join('');
-    $('chips-perfil').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { formState.perfil = c.dataset.val; renderFormChips(); });
-    });
-
-    $('chips-tipo-usuario').innerHTML = ['Master', 'No Master'].map(t =>
-        `<div class="chip ${formState.tipo === t ? 'selected' : ''}" data-val="${t}">${t}</div>`
-    ).join('');
-    $('chips-tipo-usuario').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { formState.tipo = c.dataset.val; renderFormChips(); });
-    });
-
-    $('chips-servicio').innerHTML = servicios.map(s =>
-        `<div class="chip ${formState.servicio === s ? 'selected' : ''}" data-val="${s}">${s}</div>`
-    ).join('');
-    $('chips-servicio').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { formState.servicio = c.dataset.val; renderFormChips(); });
-    });
-}
-
-$('btn-back-form').addEventListener('click', () => {
-    if (currentProfileNumber) {
-        openClientDetail(currentProfileNumber);
-    } else {
-        showScreen('list');
     }
-});
-
-$('btn-form-cancel').addEventListener('click', () => {
-    if (currentProfileNumber) {
-        openClientDetail(currentProfileNumber);
-    } else {
-        showScreen('list');
-    }
-});
-
-$('btn-guardar').addEventListener('click', async () => {
-    let numero = $('form-numero').value.trim();
-    if ($('field-numero').style.display === 'none') numero = currentProfileNumber;
-    if (!numero || numero === '+51') { toast('Ingresa un número de cliente'); return; }
-
-    const btn = $('btn-guardar');
-    btn.classList.add('loading');
-    btn.querySelector('.btn-guardar-text').classList.add('hidden');
-    btn.querySelector('.btn-spinner').classList.remove('hidden');
-    btn.disabled = true;
-
-    try {
-        await db.collection('perfiles').doc(numero).set({
-            numero: numero,
-            ultima_actividad: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-
-        await db.collection('clientes').add({
-            numero_cliente: numero,
-            correo: $('form-correo').value,
-            contrasena: $('form-pass').value,
-            tipo_cuenta: formState.servicio,
-            usuario: formState.tipo,
-            perfil: formState.perfil,
-            pin: $('form-pin').value,
-            fecha_orden: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        await updateProfileSearchData(numero);
-        toast('¡Registro guardado exitosamente!');
-
-        if (currentProfileNumber) {
-            openClientDetail(currentProfileNumber);
-        } else {
-            showScreen('list');
-        }
-    } catch (e) {
-        toast('Error: ' + e.message);
-    } finally {
-        btn.classList.remove('loading');
-        btn.querySelector('.btn-guardar-text').classList.remove('hidden');
-        btn.querySelector('.btn-spinner').classList.add('hidden');
-        btn.disabled = false;
-    }
-});
-
-$('form-numero').addEventListener('input', e => {
-    e.target.value = phoneFormat(e.target.value);
-});
-
-$('edit-numero').addEventListener('input', e => {
-    e.target.value = phoneFormat(e.target.value);
-});
-
-// ═══════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════
-async function updateProfileSearchData(numero) {
-    try {
-        const q = await db.collection('clientes').where('numero_cliente', '==', numero).get();
-        const emails = q.docs.map(d => (d.data().correo || '')).join(' ');
-        await db.collection('perfiles').doc(numero).set({
-            numero: numero,
-            search_emails: emails,
-            ultima_actividad: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-    } catch (e) { console.error('Error updating profile:', e); }
 }
 
-async function syncPerfiles() {
-    try {
-        const snap = await db.collection('clientes').get();
-        const nums = new Set();
-        snap.docs.forEach(d => { const n = d.data().numero_cliente; if (n) nums.add(n); });
-        for (const num of nums) {
-            const p = await db.collection('perfiles').doc(num).get();
-            if (!p.exists) {
-                const emails = snap.docs.filter(d => d.data().numero_cliente === num).map(d => (d.data().correo || '')).join(' ');
-                await db.collection('perfiles').doc(num).set({
-                    numero: num, search_emails: emails,
-                    ultima_actividad: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            }
-        }
-    } catch (e) { console.error('Error sync:', e); }
+.fab-option {
+    background: none;
+    border: none;
+    color: var(--text);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background var(--transition);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
-// ═══════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', async () => {
-    // Anonymous auth — invisible, no login screen
-    try {
-        await firebase.auth().signInAnonymously();
-        console.log('🔒 Auth OK');
-    } catch (e) {
-        console.error('Auth error:', e);
+.fab-option:hover {
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+
+.expiring-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 8px;
+    padding-top: 10px;
+    padding-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+    .expiring-list {
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     }
-
-    syncPerfiles();
-    initProfileList();
-    renderFormChips();
-    initServiceDropdown();
-});
-
-// ═══════════════════════════════════════════════
-// BOT FAB & EXPIRING CLIENTS
-// ═══════════════════════════════════════════════
-const fabBtn = $('fab-button');
-const fabIcon = $('fab-icon');
-
-if (fabBtn) {
-    fabBtn.addEventListener('click', () => {
-        botFilterActive = !botFilterActive;
-
-        if (botFilterActive) {
-            fabIcon.textContent = 'close';
-            fabBtn.style.background = 'var(--danger)';
-            fabBtn.style.boxShadow = '0 6px 16px var(--danger-dim)';
-        } else {
-            fabIcon.textContent = 'support_agent';
-            fabBtn.style.background = '';
-            fabBtn.style.boxShadow = '';
-        }
-
-        if (currentScreen !== 'list') {
-            showScreen('list');
-        }
-
-        renderProfiles();
-    });
-}
-
-// ═══════════════════════════════════════════════
-// SERVICE DROPDOWN
-// ═══════════════════════════════════════════════
-function initServiceDropdown() {
-    const header = $('dropdown-header');
-    const list = $('dropdown-list');
-    const selectedText = $('dropdown-selected');
-    if (!header || !list) return;
-
-    let html = `<div class="dropdown-item active" data-val="">Todos los servicios</div>`;
-    servicios.forEach(s => {
-        html += `<div class="dropdown-item" data-val="${s}">${s}</div>`;
-    });
-    list.innerHTML = html;
-
-    header.addEventListener('click', (e) => {
-        e.stopPropagation();
-        list.classList.toggle('hidden');
-    });
-
-    list.querySelectorAll('.dropdown-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            activeServiceFilter = item.dataset.val;
-            selectedText.textContent = activeServiceFilter || 'Filtrar por Servicio';
-
-            list.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-            list.classList.add('hidden');
-
-            renderProfiles();
-        });
-    });
-
-    document.addEventListener('click', () => {
-        list.classList.add('hidden');
-    });
 }
