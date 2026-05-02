@@ -82,22 +82,22 @@ function showScreen(name) {
 }
 
 // Sidebar nav clicks
-$('nav-clientes').addEventListener('click', () => { 
-    currentNavFilter = 'all'; 
-    showScreen('list'); 
-    renderProfiles(); 
+$('nav-clientes').addEventListener('click', () => {
+    currentNavFilter = 'all';
+    showScreen('list');
+    renderProfiles();
 });
 
-$('nav-vencidos').addEventListener('click', () => { 
-    currentNavFilter = 'vencidos'; 
+$('nav-vencidos').addEventListener('click', () => {
+    currentNavFilter = 'vencidos';
     // Clear service filter when clicking Vencidos
     activeServiceFilter = '';
     $('dropdown-selected').textContent = 'Filtrar por Servicio';
     $$('.dropdown-item').forEach(i => i.classList.remove('active'));
     $$('.dropdown-item[data-val=""]').forEach(i => i.classList.add('active'));
-    
-    showScreen('list'); 
-    renderProfiles(); 
+
+    showScreen('list');
+    renderProfiles();
 });
 $('nav-nuevo').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 $('btn-new-top').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
@@ -192,12 +192,12 @@ function getDaysInfo(fechaOrden) {
     const fVStr = formatDate(fV);
     const diff = fV ? (fV.getTime() - Date.now()) : 0;
     const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     // Expired accounts (dias < 0) are always red
     const colorClass = dias >= 5 ? 'days-green' : (dias >= 2 ? 'days-yellow' : 'days-red');
     const colorHex = dias >= 5 ? '#4ADE80' : (dias >= 2 ? '#FBBF24' : '#F87171');
     const badgeClass = dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red');
-    
+
     return { fC, fCStr, fV, fVStr, dias, diasRaw: dias, colorClass, colorHex, badgeClass };
 }
 
@@ -308,7 +308,7 @@ function renderProfiles() {
         let filteredAccounts = [];
         allNumbers.forEach(num => {
             let accounts = clientsData.filter(c => c.numero_cliente === num);
-            
+
             // Filter by Service if selected
             if (activeServiceFilter) {
                 accounts = accounts.filter(c => c.tipo_cuenta === activeServiceFilter);
@@ -342,7 +342,7 @@ function renderProfiles() {
                 const serviceColor = getServiceColor(acc.tipo_cuenta);
                 const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
                 const isSent = sentStatusMap[acc.id];
-                
+
                 return `
                 <tr style="animation-delay: ${idx * 0.05}s">
                     <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
@@ -965,7 +965,7 @@ if (fabBtn) {
             fabIcon.textContent = 'close';
             fabBtn.style.background = 'var(--danger)';
             fabBtn.style.boxShadow = '0 6px 16px var(--danger-dim)';
-            
+
             // Clear service filter
             activeServiceFilter = '';
             $('dropdown-selected').textContent = 'Filtrar por Servicio';
