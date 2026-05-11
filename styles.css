@@ -1923,3 +1923,166 @@ a {
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     }
 }
+
+/* ═══════════════════════════════════════════════
+   STATISTICS SCREEN
+   ═══════════════════════════════════════════════ */
+.stats-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    animation: screenIn 0.4s ease;
+}
+
+.stats-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.summary-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: transform var(--transition);
+}
+
+.summary-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--border-hover);
+}
+
+.summary-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.summary-icon .material-icons-round {
+    font-size: 28px;
+}
+
+.summary-label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+
+.summary-value {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.stats-main-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 24px;
+}
+
+.chart-card,
+.profit-list-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+}
+
+.chart-header {
+    margin-bottom: 24px;
+}
+
+.chart-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.chart-header p {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.chart-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    min-height: 350px;
+}
+
+.canvas-wrap {
+    width: 100%;
+    max-width: 400px;
+}
+
+.profit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.profit-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: background 0.2s;
+}
+
+.profit-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.profit-service-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 12px;
+    color: #000;
+}
+
+.profit-details {
+    flex: 1;
+}
+
+.profit-service-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.profit-count {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.profit-amount {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--secondary);
+}
+
+@media (max-width: 1100px) {
+    .stats-main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.table-row-hover:hover td {
+    background: rgba(255, 255, 255, 0.05);
+}

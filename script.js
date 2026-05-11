@@ -55,6 +55,20 @@ function isEstadoActivo(estadoTimestamp) {
 
 const servicios = ['Netflix', 'Disney+', 'HBO Max', 'Prime Video', 'Paramount', 'ChatGPT', 'Movistar Play', 'Crunchyroll', 'Otros'];
 
+const profitRates = {
+    'Netflix': 10,
+    'Disney+': 10,
+    'HBO Max': 8,
+    'Prime Video': 7,
+    'Paramount': 6,
+    'ChatGPT': 13,
+    'Movistar Play': 20,
+    'Crunchyroll': 6,
+    'Otros': 5
+};
+
+let profitChart = null;
+
 // ── DOM shortcuts ──
 const $ = id => document.getElementById(id);
 const $$ = sel => document.querySelectorAll(sel);
@@ -97,6 +111,11 @@ $('nav-vencidos').addEventListener('click', () => {
 
     showScreen('list');
     renderProfiles();
+});
+
+$('nav-stats').addEventListener('click', () => {
+    showScreen('stats');
+    renderStats();
 });
 $('nav-nuevo').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
 $('btn-new-top').addEventListener('click', () => { currentProfileNumber = ''; openForm(null); });
@@ -173,15 +192,15 @@ function toast(msg) {
 
 function getServiceColor(servicio) {
     const s = (servicio || '').toLowerCase();
-    if (s.includes('netflix')) return 'var(--color-netflix)';
-    if (s.includes('disney')) return 'var(--color-disney)';
-    if (s.includes('hbo') || s.includes('max')) return 'var(--color-hbo)';
-    if (s.includes('prime')) return 'var(--color-prime)';
-    if (s.includes('paramount')) return 'var(--color-paramount)';
-    if (s.includes('chatgpt')) return 'var(--color-chatgpt)';
-    if (s.includes('movistar')) return 'var(--color-movistar)';
-    if (s.includes('crunchyroll')) return 'var(--color-crunchyroll)';
-    return 'var(--color-otros)';
+    if (s.includes('netflix')) return '#F87171';
+    if (s.includes('disney')) return '#38BDF8';
+    if (s.includes('hbo') || s.includes('max')) return '#A78BFA';
+    if (s.includes('prime')) return '#0EA5E9';
+    if (s.includes('paramount')) return '#60A5FA';
+    if (s.includes('chatgpt')) return '#10A37F';
+    if (s.includes('movistar')) return '#019DF4';
+    if (s.includes('crunchyroll')) return '#F47521';
+    return '#94A3B8';
 }
 
 function getDaysInfo(fechaOrden) {
@@ -205,8 +224,10 @@ function getDaysInfo(fechaOrden) {
 // ═══════════════════════════════════════════════
 let unsubProfiles = null;
 let unsubClients = null;
+let unsubGastos = null;
 let profilesData = [];
 let clientsData = [];
+let gastosData = [];
 
 function initProfileList() {
     unsubProfiles = db.collection('perfiles').orderBy('ultima_actividad', 'desc').onSnapshot(snap => {
@@ -225,6 +246,14 @@ function initProfileList() {
         renderProfiles();
     }, err => {
         console.error("Error al cargar clientes:", err);
+    });
+
+    unsubGastos = db.collection('gastos').onSnapshot(snap => {
+        gastosData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateStats();
+        if (typeof renderGastosHistory === 'function') renderGastosHistory();
+    }, err => {
+        console.error("Error al cargar gastos:", err);
     });
 
     $('search-profiles').addEventListener('input', () => renderProfiles());
@@ -246,6 +275,166 @@ function updateStats() {
     $('stat-expiring').textContent = expiring;
     if ($('stat-cuentas')) $('stat-cuentas').textContent = clientsData.length;
     $('mobile-stat-total').textContent = totalProfiles;
+
+    if (currentScreen === 'stats') renderStats();
+}
+
+function renderStats() {
+    const statsData = {};
+    servicios.forEach(s => statsData[s] = { count: 0, profit: 0 });
+
+    const statsFilter = window.currentStatsFilter || 'all';
+    const clientMap = {};
+    let totalSalesFiltered = 0;
+
+    clientsData.forEach(c => {
+        if (statsFilter === 'active') {
+            const { diasRaw } = getDaysInfo(c.fecha_orden);
+            if (diasRaw < 0) return; // Skip expired
+        }
+
+        const s = c.tipo_cuenta;
+        const rate = c.precio !== undefined ? parseFloat(c.precio) : (profitRates[s] || 0);
+        const profit = isNaN(rate) ? 0 : rate;
+
+        if (statsData[s] !== undefined) {
+            statsData[s].count++;
+            statsData[s].profit += profit;
+        }
+
+        totalSalesFiltered++;
+
+        const num = c.numero_cliente || 'Desconocido';
+        if (!clientMap[num]) clientMap[num] = { count: 0, profit: 0 };
+        clientMap[num].count++;
+        clientMap[num].profit += profit;
+    });
+
+    let totalProfit = 0;
+    const labels = [];
+    const dataValues = [];
+    const backgroundColors = [];
+    let topService = { name: '—', count: 0 };
+
+    let listHtml = '';
+
+    servicios.forEach(s => {
+        const count = statsData[s].count;
+        const profit = statsData[s].profit;
+        totalProfit += profit;
+
+        if (count > 0) {
+            labels.push(s);
+            dataValues.push(count);
+            backgroundColors.push(getServiceColor(s));
+            if (count > topService.count) topService = { name: s, count };
+        }
+
+        listHtml += `
+            <div class="profit-item">
+                <div class="profit-service-icon" style="background: ${getServiceColor(s)}">
+                    ${s.charAt(0)}
+                </div>
+                <div class="profit-details">
+                    <span class="profit-service-name">${s}</span>
+                    <span class="profit-count">${count} ventas</span>
+                </div>
+                <div class="profit-amount">S/ ${profit.toFixed(2)}</div>
+            </div>
+        `;
+    });
+
+    let totalGastos = 0;
+    gastosData.forEach(g => {
+        totalGastos += parseFloat(g.monto) || 0;
+    });
+
+    const netProfit = totalProfit - totalGastos;
+
+    if ($('stats-total-profit')) $('stats-total-profit').textContent = `S/ ${netProfit.toFixed(2)}`;
+    if ($('stats-total-gastos')) $('stats-total-gastos').textContent = `S/ ${totalGastos.toFixed(2)}`;
+    if ($('stats-top-service')) $('stats-top-service').textContent = topService.name;
+    if ($('stats-total-sales')) $('stats-total-sales').textContent = totalSalesFiltered;
+    if ($('stats-profit-list')) $('stats-profit-list').innerHTML = listHtml;
+
+    // Render Top Clients
+    const sortedClients = Object.entries(clientMap)
+        .map(([num, data]) => ({ num, ...data }))
+        .sort((a, b) => b.profit - a.profit);
+
+    const tbodyClients = $('stats-top-clients-body');
+    if (tbodyClients) {
+        if (sortedClients.length === 0) {
+            tbodyClients.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 24px; color: var(--text-dim);">No hay clientes</td></tr>`;
+        } else {
+            tbodyClients.innerHTML = sortedClients.map(client => `
+                <tr onclick="openClientDetail('${client.num}')" style="cursor: pointer; transition: background 0.2s;" class="table-row-hover">
+                    <td style="font-weight: bold; color: var(--primary);">${client.num}</td>
+                    <td>${client.count} cuenta${client.count !== 1 ? 's' : ''}</td>
+                    <td style="font-weight: bold; color: #4ADE80;">S/ ${client.profit.toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // Render Chart
+    const chartEl = $('profitChart');
+    if (!chartEl) return;
+    const ctx = chartEl.getContext('2d');
+    if (profitChart) profitChart.destroy();
+
+    profitChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: dataValues,
+                backgroundColor: backgroundColors,
+                borderColor: '#111a33',
+                borderWidth: 2,
+                hoverOffset: 25
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '75%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#E2E8F0',
+                        padding: 24,
+                        usePointStyle: true,
+                        font: { size: 12, weight: '600', family: 'Inter' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#111a33',
+                    titleColor: '#fff',
+                    bodyColor: '#E2E8F0',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 10,
+                    displayColors: true,
+                    callbacks: {
+                        label: function (context) {
+                            const val = context.raw;
+                            const percentage = totalSales > 0 ? ((val / totalSales) * 100).toFixed(1) : 0;
+                            return ` ${context.label}: ${val} ventas (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateScale: true,
+                animateRotate: true,
+                duration: 1000,
+                easing: 'easeOutQuart'
+            }
+        }
+    });
 }
 
 function renderProfiles() {
@@ -343,19 +532,19 @@ function renderProfiles() {
                 const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
 
                 return `
-                <tr style="animation-delay: ${idx * 0.05}s">
+                <tr style="animation-delay: ${idx * 0.05}s; cursor: pointer;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
                     <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
                     <td style="color: ${serviceColor}; font-weight: 800; text-shadow: 0 0 10px ${serviceColor}44;">${escapeHtml(acc.tipo_cuenta)}</td>
                     <td>${escapeHtml(acc.correo || 'N/A')}</td>
                     <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
                     <td>${daysBadge}</td>
                     <td>
-                        <div class="status-indicator ${isEstadoActivo(acc.estado_timestamp) ? 'sent' : ''}" onclick="toggleSentStatus('${acc.id}', ${isEstadoActivo(acc.estado_timestamp)})">
+                        <div class="status-indicator ${isEstadoActivo(acc.estado_timestamp) ? 'sent' : ''}" onclick="event.stopPropagation(); toggleSentStatus('${acc.id}', ${isEstadoActivo(acc.estado_timestamp)})">
                             <span class="material-icons-round">${isEstadoActivo(acc.estado_timestamp) ? 'check_circle' : 'radio_button_unchecked'}</span>
                         </div>
                     </td>
                     <td>
-                        <div style="display: flex; gap: 8px; justify-content: center;">
+                        <div style="display: flex; gap: 8px; justify-content: center;" onclick="event.stopPropagation()">
                             <button class="btn-primary" style="padding: 6px 10px; font-size: 10px; min-width: 60px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
                                 <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
                             </button>
@@ -600,6 +789,10 @@ function renderPurchases(docs) {
                         <span class="material-icons-round" style="color:${colorHex}">event</span>
                         <div><div class="info-label">Vence</div><div class="info-value accent" style="color:${colorHex}">${fVStr}</div></div>
                     </div>
+                    <div class="info-item">
+                        <span class="material-icons-round" style="color: var(--secondary)">payments</span>
+                        <div><div class="info-label">Precio</div><div class="info-value">S/ ${data.precio !== undefined ? data.precio : (profitRates[data.tipo_cuenta] || '0')}</div></div>
+                    </div>
                 </div>
             </div>
             <div class="card-footer">
@@ -670,6 +863,7 @@ function openEditModal(docId, data) {
     $('edit-correo').value = data.correo || '';
     $('edit-pass').value = data.contrasena || '';
     $('edit-pin').value = data.pin || '';
+    $('edit-precio').value = data.precio !== undefined ? data.precio : (profitRates[data.tipo_cuenta] || '');
 
     if ($('edit-update-all')) $('edit-update-all').checked = false;
 
@@ -725,11 +919,15 @@ $('edit-save').addEventListener('click', async () => {
         const nuevaContrasena = $('edit-pass').value;
         const updateAll = $('edit-update-all') ? $('edit-update-all').checked : false;
 
+        const priceVal = parseFloat($('edit-precio').value);
+        const finalPrice = !isNaN(priceVal) ? priceVal : (profitRates[editState.servicio] || 0);
+
         const updateData = {
             numero_cliente: nuevoNumero,
             correo: nuevoCorreo,
             contrasena: nuevaContrasena,
             pin: $('edit-pin').value,
+            precio: finalPrice,
             tipo_cuenta: editState.servicio,
             perfil: editState.perfil,
             usuario: editState.tipo,
@@ -757,7 +955,8 @@ $('edit-save').addEventListener('click', async () => {
                             contrasena: nuevaContrasena,
                             tipo_cuenta: editState.servicio,
                             perfil: editState.perfil,
-                            pin: $('edit-pin').value
+                            pin: $('edit-pin').value,
+                            precio: finalPrice
                         });
                     }
                 });
@@ -785,7 +984,9 @@ $('edit-save').addEventListener('click', async () => {
 
         toast('Registro actualizado');
     } catch (e) { toast('Error: ' + e.message); }
-    $('modal-edit').classList.add('hidden');
+            $('modal-edit').classList.add('hidden');
+        // Recalculate stats and refresh if we are on the stats screen
+        updateStats();
 });
 
 // ── Delete purchase ──
@@ -834,6 +1035,7 @@ function openForm(prefilledNumber) {
     $('form-correo').value = '';
     $('form-pass').value = '';
     $('form-pin').value = '';
+    $('form-precio').value = profitRates['Netflix'] || '';
     formState = { perfil: '1', tipo: 'Master', servicio: 'Netflix' };
 
     $('field-numero').style.display = prefilledNumber ? 'none' : '';
@@ -863,7 +1065,11 @@ function renderFormChips() {
         return `<div class="chip ${isSelected ? 'selected' : ''}" data-val="${s}" ${style}>${s}</div>`;
     }).join('');
     $('chips-servicio').querySelectorAll('.chip').forEach(c => {
-        c.addEventListener('click', () => { formState.servicio = c.dataset.val; renderFormChips(); });
+        c.addEventListener('click', () => { 
+            formState.servicio = c.dataset.val; 
+            $('form-precio').value = profitRates[formState.servicio] || '';
+            renderFormChips(); 
+        });
     });
 }
 
@@ -900,6 +1106,9 @@ $('btn-guardar').addEventListener('click', async () => {
             ultima_actividad: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
+        const formPriceVal = parseFloat($('form-precio').value);
+        const formFinalPrice = !isNaN(formPriceVal) ? formPriceVal : (profitRates[formState.servicio] || 0);
+
         await db.collection('clientes').add({
             numero_cliente: numero,
             correo: $('form-correo').value,
@@ -908,11 +1117,14 @@ $('btn-guardar').addEventListener('click', async () => {
             usuario: formState.tipo,
             perfil: formState.perfil,
             pin: $('form-pin').value,
+            precio: formFinalPrice,
             fecha_orden: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         await updateProfileSearchData(numero);
-        toast('¡Registro guardado exitosamente!');
+                toast('¡Registro guardado exitosamente!');
+        // Refresh stats after adding a new purchase
+        updateStats();
 
         if (currentProfileNumber) {
             openClientDetail(currentProfileNumber);
@@ -1074,3 +1286,132 @@ function initServiceDropdown() {
         list.classList.add('hidden');
     });
 }
+
+// ═══════════════════════════════════════════════
+// GASTOS (EXPENSES)
+// ═══════════════════════════════════════════════
+function renderGastosHistory() {
+    const tbody = $('gastos-history-body');
+    if (!tbody) return;
+
+    if (gastosData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 24px; color: var(--text-dim);">No hay gastos registrados</td></tr>`;
+        return;
+    }
+
+    const sortedGastos = [...gastosData].sort((a, b) => {
+        const t1 = a.fecha ? a.fecha.toDate().getTime() : 0;
+        const t2 = b.fecha ? b.fecha.toDate().getTime() : 0;
+        return t2 - t1;
+    });
+
+    tbody.innerHTML = sortedGastos.map(g => {
+        const date = g.fecha ? formatDate(g.fecha.toDate()) : 'Sin fecha';
+        return `
+        <tr>
+            <td>${date}</td>
+            <td style="font-weight: bold; color: var(--danger);">S/ ${parseFloat(g.monto).toFixed(2)}</td>
+            <td style="text-align: center;">
+                <button class="btn-card delete" style="margin: 0 auto; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" onclick="confirmDeleteGasto('${g.id}')">
+                    <span class="material-icons-round" style="font-size: 18px;">delete</span>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+let gastoToDelete = null;
+window.confirmDeleteGasto = function(id) {
+    gastoToDelete = id;
+    if ($('confirm-delete-text')) {
+        $('confirm-delete-text').textContent = '¿Estás seguro de eliminar este gasto? El monto se restaurará a tu Ganancia Total.';
+    }
+    if ($('modal-confirm-delete')) {
+        $('modal-confirm-delete').classList.remove('hidden');
+    }
+};
+
+if ($('confirm-delete-cancel')) {
+    $('confirm-delete-cancel').addEventListener('click', () => {
+        $('modal-confirm-delete').classList.add('hidden');
+        gastoToDelete = null;
+    });
+}
+if ($('confirm-close-x')) {
+    $('confirm-close-x').addEventListener('click', () => {
+        $('modal-confirm-delete').classList.add('hidden');
+        gastoToDelete = null;
+    });
+}
+if ($('confirm-delete-ok')) {
+    $('confirm-delete-ok').addEventListener('click', async () => {
+        if (!gastoToDelete) return;
+        try {
+            await db.collection('gastos').doc(gastoToDelete).delete();
+            toast('Gasto eliminado');
+            $('modal-confirm-delete').classList.add('hidden');
+            gastoToDelete = null;
+        } catch (e) {
+            toast('Error: ' + e.message);
+        }
+    });
+}
+
+if ($('card-gastos')) {
+    $('card-gastos').addEventListener('click', () => {
+        if ($('expense-monto')) $('expense-monto').value = '';
+        renderGastosHistory();
+        $('modal-gastos-list').classList.remove('hidden');
+    });
+}
+
+if ($('gastos-close-x')) $('gastos-close-x').addEventListener('click', () => $('modal-gastos-list').classList.add('hidden'));
+if ($('modal-gastos-list')) {
+    $('modal-gastos-list').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-gastos-list').classList.add('hidden'));
+}
+
+if ($('expense-save')) {
+    $('expense-save').addEventListener('click', async () => {
+        const monto = parseFloat($('expense-monto').value);
+
+        if (isNaN(monto) || monto <= 0) {
+            toast('Ingresa un monto válido mayor a 0');
+            return;
+        }
+
+        const btn = $('expense-save');
+        btn.disabled = true;
+
+        try {
+            await db.collection('gastos').add({
+                monto: monto,
+                fecha: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            toast('Gasto guardado correctamente');
+            if ($('expense-monto')) $('expense-monto').value = '';
+        } catch (e) {
+            toast('Error al guardar gasto: ' + e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════
+// FILTER STATS
+// ═══════════════════════════════════════════════
+window.currentStatsFilter = 'all';
+document.querySelectorAll('.stats-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.stats-toggle-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.color = 'var(--text-dim)';
+        });
+        btn.classList.add('active');
+        btn.style.background = 'var(--primary)';
+        btn.style.color = '#000';
+        window.currentStatsFilter = btn.dataset.val;
+        updateStats();
+    });
+});
