@@ -64,6 +64,13 @@
                     <span class="stat-label">Por vencer</span>
                 </div>
             </div>
+            <div class="stat-card">
+                <span class="material-icons-round stat-icon" style="color: var(--primary)">shopping_bag</span>
+                <div>
+                    <span class="stat-number" id="stat-cuentas">—</span>
+                    <span class="stat-label">Cuentas</span>
+                </div>
+            </div>
         </div>
 
         <div class="sidebar-footer">
@@ -308,6 +315,13 @@
                 </div>
 
                 <div class="form-section">
+                    <label class="checkbox-container"
+                        style="display: flex; align-items: center; gap: 10px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 16px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);">
+                        <input type="checkbox" id="edit-update-all"
+                            style="width: 18px; height: 18px; accent-color: var(--primary);">
+                        <span style="font-size: 14px;">Actualizar cuenta (Correo, Pass, Perfil y PIN) a <b>todos los
+                                clientes</b> que la comparten</span>
+                    </label>
                     <h3>Servicio</h3>
                     <div class="chips-row" id="edit-chips-servicio"></div>
                 </div>

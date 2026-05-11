@@ -244,6 +244,7 @@ function updateStats() {
 
     $('stat-total').textContent = totalProfiles;
     $('stat-expiring').textContent = expiring;
+    if ($('stat-cuentas')) $('stat-cuentas').textContent = clientsData.length;
     $('mobile-stat-total').textContent = totalProfiles;
 }
 
@@ -670,6 +671,8 @@ function openEditModal(docId, data) {
     $('edit-pass').value = data.contrasena || '';
     $('edit-pin').value = data.pin || '';
 
+    if ($('edit-update-all')) $('edit-update-all').checked = false;
+
     const fC = parseFecha(data.fecha_orden);
     $('edit-fecha').value = fC ? toISODate(fC) : toISODate(new Date());
 
@@ -718,17 +721,53 @@ $('edit-save').addEventListener('click', async () => {
         const fechaVal = $('edit-fecha').value;
         const fechaDate = fechaVal ? new Date(fechaVal + 'T00:00:00') : new Date();
         const nuevoNumero = $('edit-numero').value.trim();
+        const nuevoCorreo = $('edit-correo').value.trim();
+        const nuevaContrasena = $('edit-pass').value;
+        const updateAll = $('edit-update-all') ? $('edit-update-all').checked : false;
 
-        await db.collection('clientes').doc(editDocId).update({
+        const updateData = {
             numero_cliente: nuevoNumero,
-            correo: $('edit-correo').value,
-            contrasena: $('edit-pass').value,
+            correo: nuevoCorreo,
+            contrasena: nuevaContrasena,
             pin: $('edit-pin').value,
             tipo_cuenta: editState.servicio,
             perfil: editState.perfil,
             usuario: editState.tipo,
             fecha_orden: firebase.firestore.Timestamp.fromDate(fechaDate)
-        });
+        };
+
+        if (updateAll) {
+            const oldDoc = currentPurchaseDocs.find(x => x.id === editDocId);
+            const oldData = oldDoc ? oldDoc.data() : null;
+
+            if (oldData && oldData.correo && oldData.tipo_cuenta) {
+                const snap = await db.collection('clientes')
+                    .where('correo', '==', oldData.correo)
+                    .where('tipo_cuenta', '==', oldData.tipo_cuenta)
+                    .get();
+
+                const batch = db.batch();
+                snap.docs.forEach(d => {
+                    if (d.id === editDocId) {
+                        batch.update(d.ref, updateData);
+                    } else {
+                        // Actualizar correo, contraseña, servicio, perfil y pin para los demás
+                        batch.update(d.ref, {
+                            correo: nuevoCorreo,
+                            contrasena: nuevaContrasena,
+                            tipo_cuenta: editState.servicio,
+                            perfil: editState.perfil,
+                            pin: $('edit-pin').value
+                        });
+                    }
+                });
+                await batch.commit();
+            } else {
+                await db.collection('clientes').doc(editDocId).update(updateData);
+            }
+        } else {
+            await db.collection('clientes').doc(editDocId).update(updateData);
+        }
 
         // Ensure the profile exists if the number changed or was typed
         if (nuevoNumero) {
