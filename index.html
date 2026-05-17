@@ -61,7 +61,7 @@
                     <span class="stat-label">Clientes</span>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="card-por-vencer" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
                 <span class="material-icons-round stat-icon warning">warning</span>
                 <div>
                     <span class="stat-number" id="stat-expiring">—</span>
@@ -130,6 +130,10 @@
                         <!-- Opciones dinámicas -->
                     </div>
                 </div>
+                <button class="btn-ghost hidden" id="btn-edit-template-vencidos" style="border-color: var(--warning); color: var(--warning);">
+                    <span class="material-icons-round">description</span>
+                    Plantilla Vencidos
+                </button>
             </div>
 
             <div id="profiles-grid" class="profiles-grid">
@@ -143,13 +147,18 @@
                 <table class="service-table">
                     <thead>
                         <tr>
-                            <th>Teléfono</th>
-                            <th>Correo</th>
-                            <th>Contraseña</th>
-                            <th>Fecha de Compra</th>
-                            <th>Fecha de Vencimiento</th>
-                            <th>Días Restantes</th>
-                            <th>Acción</th>
+                            <th>TELÉFONO</th>
+                            <th>SERVICIO</th>
+                            <th onclick="toggleSort('email')" style="cursor: pointer; user-select: none;">
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    CORREO 
+                                    <span class="material-icons-round" id="sort-icon-email" style="font-size: 16px; color: var(--text-muted);">unfold_more</span>
+                                </div>
+                            </th>
+                            <th>CONTRASEÑA</th>
+                            <th>DÍAS</th>
+                            <th style="text-align: center;">ESTADO</th>
+                            <th style="text-align: right;">ACCIÓN</th>
                         </tr>
                     </thead>
                     <tbody id="service-table-body">
@@ -566,6 +575,63 @@
         </button>
     </div>
 
+    <!-- ===== MODAL: EDIT WHATSAPP TEMPLATE ===== -->
+    <div class="modal-overlay hidden" id="modal-template-editor">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2>Plantilla de WhatsApp (Vencidos)</h2>
+                <button class="modal-close" id="template-close-x"><span class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">Usa los siguientes tags para datos dinámicos:<br>
+                <code style="color: var(--primary)">{SERVICIO}, {CORREO}, {PASS}, {PERFIL}, {PIN}, {TIPO}, {COMPRA}, {VENCE}, {DIAS}</code></p>
+                
+                <div class="template-tabs" id="template-tabs" style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
+                    <!-- Botones generados en JS -->
+                </div>
+
+                <div class="form-group full">
+                    <textarea id="template-text" style="width: 100%; height: 200px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="template-cancel">Cancelar</button>
+                <button class="btn-primary" id="template-save" style="background: var(--warning); color: #000;">
+                    <span class="material-icons-round">save</span>
+                    Guardar Plantilla
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: EDIT WHATSAPP MESSAGE ===== -->
+    <div class="modal-overlay hidden" id="modal-whatsapp-edit">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2>Editar Mensaje de WhatsApp</h2>
+                <button class="modal-close" id="wa-edit-close-x"><span class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="template-tabs" id="wa-edit-template-tabs" style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
+                    <!-- Botones generados en JS -->
+                </div>
+                <div class="form-group full">
+                    <label><span class="material-icons-round">chat</span> Mensaje Personalizado</label>
+                    <textarea id="wa-edit-text" style="width: 100%; height: 250px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="wa-edit-cancel">Cancelar</button>
+                <button class="btn-primary" id="wa-edit-send">
+                    <span class="material-icons-round">send</span>
+                    Enviar a WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== MODAL: GASTOS HISTORY ===== -->
     <div class="modal-overlay hidden" id="modal-gastos-list">
         <div class="modal-backdrop"></div>
@@ -619,6 +685,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
     <script src="script.js"></script>
 
 </body>

@@ -15,6 +15,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 // ── State ──
 let currentScreen = 'list';
@@ -24,8 +25,10 @@ let editDocId = '';
 let editState = {};
 let allClientsCache = [];
 let botFilterActive = false;
-let currentNavFilter = 'all';
+let currentNavFilter = 'todos';
 let activeServiceFilter = '';
+let currentSort = 'days'; // 'days', 'email'
+let sortDirection = 'asc';
 let sentStatusMap = JSON.parse(localStorage.getItem('sent_status') || '{}');
 
 // ESTADO: Usa Firestore (campo estado_timestamp) para sincronizar con la app Flutter.
@@ -113,6 +116,20 @@ $('nav-vencidos').addEventListener('click', () => {
     renderProfiles();
 });
 
+if ($('card-por-vencer')) {
+    $('card-por-vencer').addEventListener('click', () => {
+        currentNavFilter = 'por_vencer';
+        activeServiceFilter = '';
+        if ($('dropdown-selected')) $('dropdown-selected').textContent = 'Filtrar por Servicio';
+        $$('.dropdown-item').forEach(i => i.classList.remove('active'));
+        $$('.dropdown-item[data-val=""]').forEach(i => i.classList.add('active'));
+        $$('.nav-item').forEach(n => n.classList.remove('active')); // Clear nav selection
+        
+        showScreen('list');
+        renderProfiles();
+    });
+}
+
 $('nav-stats').addEventListener('click', () => {
     showScreen('stats');
     renderStats();
@@ -190,6 +207,39 @@ function toast(msg) {
     toast._t = setTimeout(() => t.classList.add('hidden'), 3500);
 }
 
+async function copyToClipboard(text, label) {
+    try {
+        await navigator.clipboard.writeText(text);
+        toast(`${label} copiado al portapapeles`);
+    } catch (err) {
+        console.error('Error al copiar:', err);
+        toast('Error al copiar al portapapeles');
+    }
+}
+
+function toggleSort(type) {
+    // Si ya está ordenado por este tipo, regresa al orden por defecto (días)
+    if (currentSort === type) {
+        currentSort = 'days';
+    } else {
+        currentSort = type;
+    }
+    
+    // Actualizar iconos
+    const emailIcon = $('sort-icon-email');
+    if (emailIcon) {
+        if (currentSort === 'email') {
+            emailIcon.innerText = 'expand_more'; // Indica que el agrupamiento por correo está activo
+            emailIcon.style.color = 'var(--primary)';
+        } else {
+            emailIcon.innerText = 'unfold_more';
+            emailIcon.style.color = 'var(--text-muted)';
+        }
+    }
+    
+    renderProfiles();
+}
+
 function getServiceColor(servicio) {
     const s = (servicio || '').toLowerCase();
     if (s.includes('netflix')) return '#F87171';
@@ -203,6 +253,35 @@ function getServiceColor(servicio) {
     return '#94A3B8';
 }
 
+const emailPalette = [];
+for (let i = 0; i < 100; i++) {
+    const hue = (i * 137.5) % 360; // Use golden angle for better distribution
+    emailPalette.push({
+        bg: `hsla(${hue}, 75%, 70%, 0.15)`,
+        border: `hsl(${hue}, 75%, 70%)`
+    });
+}
+
+function getEmailColor(email, isExpired) {
+    if (isExpired || currentNavFilter === 'vencidos' || !email || email === 'N/A') return 'transparent';
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) {
+        hash = email.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash % 100);
+    return emailPalette[idx].bg;
+}
+
+function getEmailBorderColor(email, isExpired) {
+    if (isExpired || currentNavFilter === 'vencidos' || !email || email === 'N/A') return 'transparent';
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) {
+        hash = email.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash % 100);
+    return emailPalette[idx].border;
+}
+
 function getDaysInfo(fechaOrden) {
     const fC = parseFecha(fechaOrden);
     const fCStr = formatDate(fC);
@@ -212,11 +291,12 @@ function getDaysInfo(fechaOrden) {
     const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
 
     // Expired accounts (dias < 0) are always red
-    const colorClass = dias >= 5 ? 'days-green' : (dias >= 2 ? 'days-yellow' : 'days-red');
-    const colorHex = dias >= 5 ? '#4ADE80' : (dias >= 2 ? '#FBBF24' : '#F87171');
-    const badgeClass = dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red');
+    const isExpired = dias < 0;
+    const colorClass = dias >= 3 ? 'days-green' : (dias === 2 ? 'days-yellow' : 'days-red');
+    const colorHex = dias >= 3 ? '#4ADE80' : (dias === 2 ? '#FBBF24' : '#F87171');
+    const badgeClass = dias >= 3 ? 'green' : (dias === 2 ? 'yellow' : 'red');
 
-    return { fC, fCStr, fV, fVStr, dias, diasRaw: dias, colorClass, colorHex, badgeClass };
+    return { fC, fCStr, fV, fVStr, dias, diasRaw: dias, colorClass, colorHex, badgeClass, isExpired };
 }
 
 // ═══════════════════════════════════════════════
@@ -421,7 +501,7 @@ function renderStats() {
                     callbacks: {
                         label: function (context) {
                             const val = context.raw;
-                            const percentage = totalSales > 0 ? ((val / totalSales) * 100).toFixed(1) : 0;
+                            const percentage = totalSalesFiltered > 0 ? ((val / totalSalesFiltered) * 100).toFixed(1) : 0;
                             return ` ${context.label}: ${val} ventas (${percentage}%)`;
                         }
                     }
@@ -457,11 +537,19 @@ function renderProfiles() {
 
     if (filter) {
         allNumbers = allNumbers.filter(num => {
-            if (num.toLowerCase().includes(filter)) return true;
-            if (clientsData.some(c => c.numero_cliente === num && (c.correo || '').toLowerCase().includes(filter))) return true;
-            if (clientsData.some(c => c.numero_cliente === num && (c.tipo_cuenta || '').toLowerCase().includes(filter))) return true;
-            const prof = profilesData.find(p => p.numero === num);
-            if (prof && (prof.search_emails || '').toLowerCase().includes(filter)) return true;
+            const cleanNum = num.replace(/\D/g, '').replace(/^51/, '');
+            const cleanFilter = filter.replace(/\D/g, '').replace(/^51/, '');
+            
+            // Check if phone number starts with filter
+            if (cleanFilter && cleanNum.startsWith(cleanFilter)) return true;
+            if (num.toLowerCase().startsWith(filter)) return true;
+            
+            // Check if any associated account (email or service) starts with filter
+            if (clientsData.some(c => c.numero_cliente === num && (
+                (c.correo || '').toLowerCase().startsWith(filter) || 
+                (c.tipo_cuenta || '').toLowerCase().startsWith(filter)
+            ))) return true;
+            
             return false;
         });
     }
@@ -481,13 +569,24 @@ function renderProfiles() {
         grid.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
+        // Show template button only in Vencidos
+        if ($('btn-edit-template-vencidos')) {
+            if (currentNavFilter === 'vencidos') $('btn-edit-template-vencidos').classList.remove('hidden');
+            else $('btn-edit-template-vencidos').classList.add('hidden');
+        }
+
         // Update Headers dynamically (Unified Structure)
         if (thead) {
             thead.innerHTML = `
                 <th>Teléfono</th>
-                <th>Servicio</th>
-                <th>Correo</th>
-                <th>Contraseña</th>
+                <th>SERVICIO</th>
+                <th onclick="toggleSort('email')" style="cursor: pointer; user-select: none;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        CORREO 
+                        <span class="material-icons-round" id="sort-icon-email" style="font-size: 16px; color: var(--text-muted);">unfold_more</span>
+                    </div>
+                </th>
+                <th>CONTRASEÑA</th>
                 <th>Días</th>
                 <th style="text-align: center;">Estado</th>
                 <th style="text-align: center;">Acción</th>
@@ -497,6 +596,15 @@ function renderProfiles() {
         let filteredAccounts = [];
         allNumbers.forEach(num => {
             let accounts = clientsData.filter(c => c.numero_cliente === num);
+
+            // Filter by search string if present (match by initial letter)
+            if (filter) {
+                accounts = accounts.filter(acc => 
+                    (acc.numero_cliente || '').toLowerCase().startsWith(filter) ||
+                    (acc.correo || '').toLowerCase().startsWith(filter) ||
+                    (acc.tipo_cuenta || '').toLowerCase().startsWith(filter)
+                );
+            }
 
             // Filter by Service if selected
             if (activeServiceFilter) {
@@ -508,35 +616,79 @@ function renderProfiles() {
                 const { dias } = getDaysInfo(acc.fecha_orden);
                 // In Bot mode or Search we might show all, but user wants Vencidos only in Vencidos tab
                 if (currentNavFilter === 'vencidos') return dias < 0;
+                if (currentNavFilter === 'por_vencer') return dias >= 0 && dias <= 2;
                 return dias >= 0;
             });
 
             filteredAccounts.push(...accounts);
         });
 
-        if (filteredAccounts.length === 0) {
-            const label = activeServiceFilter ? `cuentas de ${activeServiceFilter}` : 'cuentas';
-            const statusLabel = currentNavFilter === 'vencidos' ? 'vencidas' : 'vigentes';
-            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label} ${statusLabel}</td></tr>`;
-        } else {
-            // Sort by days remaining
-            filteredAccounts.sort((a, b) => {
+        // Apply Sorting
+        if (currentSort === 'email') {
+            // Group by email: Find the first occurrence of each email and pull all its duplicates together
+            const grouped = [];
+            const seenEmails = new Set();
+            
+            // First, sort by days to have a base order
+            const baseList = [...filteredAccounts].sort((a, b) => {
                 const da = getDaysInfo(a.fecha_orden).diasRaw;
                 const db = getDaysInfo(b.fecha_orden).diasRaw;
                 return da - db;
             });
 
+            baseList.forEach(acc => {
+                const email = (acc.correo || 'N/A').toLowerCase();
+                if (!seenEmails.has(email)) {
+                    // Pull all accounts with this email
+                    const sameEmail = baseList.filter(a => (a.correo || 'N/A').toLowerCase() === email);
+                    grouped.push(...sameEmail);
+                    seenEmails.add(email);
+                }
+            });
+            filteredAccounts = grouped;
+        } else {
+            // Default sort by days remaining
+            filteredAccounts.sort((a, b) => {
+                const da = getDaysInfo(a.fecha_orden).diasRaw;
+                const db = getDaysInfo(b.fecha_orden).diasRaw;
+                return da - db;
+            });
+        }
+
+        if (filteredAccounts.length === 0) {
+            const label = activeServiceFilter ? `cuentas de ${activeServiceFilter}` : 'cuentas';
+            const statusLabel = currentNavFilter === 'vencidos' ? 'vencidas' : 'vigentes';
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-dim);">No se encontraron ${label} ${statusLabel}</td></tr>`;
+        } else {
             if (tbody) tbody.innerHTML = filteredAccounts.map((acc, idx) => {
-                const { dias } = getDaysInfo(acc.fecha_orden);
+                const { dias, badgeClass } = getDaysInfo(acc.fecha_orden);
                 const serviceColor = getServiceColor(acc.tipo_cuenta);
-                const daysBadge = `<span class="profile-badge ${dias >= 5 ? 'green' : (dias >= 2 ? 'yellow' : 'red')}">${dias}d</span>`;
+                const daysBadge = `<span class="profile-badge ${badgeClass}">${dias}d</span>`;
+
+                const isMaster = (acc.usuario || '').trim().toLowerCase() === 'master';
+                const masterCheck = isMaster ? `<span class="material-icons-round" style="font-size: 15px; margin-left: 6px; color: #4ADE80;" title="Cuenta Master">check_circle</span>` : '';
 
                 return `
                 <tr style="animation-delay: ${idx * 0.05}s; cursor: pointer;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
                     <td style="font-weight: 600;">${escapeHtml(acc.numero_cliente)}</td>
-                    <td style="color: ${serviceColor}; font-weight: 800; text-shadow: 0 0 10px ${serviceColor}44;">${escapeHtml(acc.tipo_cuenta)}</td>
-                    <td>${escapeHtml(acc.correo || 'N/A')}</td>
-                    <td>${escapeHtml(acc.contrasena || 'N/A')}</td>
+                    <td style="color: ${serviceColor}; font-weight: 800; text-shadow: 0 0 10px ${serviceColor}44;">
+                        <div style="display: flex; align-items: center;">
+                            ${escapeHtml(acc.tipo_cuenta)}
+                            ${masterCheck}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="copyable-cell">
+                            ${acc.correo ? `<button class="btn-copy-small" onclick="event.stopPropagation(); copyToClipboard('${escapeHtml(acc.correo)}', 'Correo')"><span class="material-icons-round">content_copy</span></button>` : ''}
+                            <span class="truncate email-tag" style="background: ${getEmailColor(acc.correo, getDaysInfo(acc.fecha_orden).isExpired)}; color: ${getDaysInfo(acc.fecha_orden).isExpired || currentNavFilter === 'vencidos' ? 'var(--text)' : getEmailBorderColor(acc.correo, getDaysInfo(acc.fecha_orden).isExpired)}; border: 1px solid ${getEmailBorderColor(acc.correo, getDaysInfo(acc.fecha_orden).isExpired)}33;">${escapeHtml(acc.correo || 'N/A')}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="copyable-cell">
+                            ${acc.contrasena ? `<button class="btn-copy-small" onclick="event.stopPropagation(); copyToClipboard('${escapeHtml(acc.contrasena)}', 'Contraseña')"><span class="material-icons-round">content_copy</span></button>` : ''}
+                            <span class="truncate fade-out">${escapeHtml(acc.contrasena || 'N/A')}</span>
+                        </div>
+                    </td>
                     <td>${daysBadge}</td>
                     <td>
                         <div class="status-indicator ${isEstadoActivo(acc.estado_timestamp) ? 'sent' : ''}" onclick="event.stopPropagation(); toggleSentStatus('${acc.id}', ${isEstadoActivo(acc.estado_timestamp)})">
@@ -545,9 +697,11 @@ function renderProfiles() {
                     </td>
                     <td>
                         <div style="display: flex; gap: 8px; justify-content: center;" onclick="event.stopPropagation()">
-                            <button class="btn-primary" style="padding: 6px 10px; font-size: 10px; min-width: 60px;" onclick="openClientDetail('${escapeHtml(acc.numero_cliente)}')">
-                                <span class="material-icons-round" style="font-size: 14px;">visibility</span> VER
-                            </button>
+                            ${currentNavFilter === 'vencidos' ? `
+                                <button class="btn-ghost" style="padding: 6px 10px; font-size: 10px; border-color: var(--primary); color: var(--primary);" onclick="openWhatsAppEditor('${acc.id}')">
+                                    <span class="material-icons-round" style="font-size: 14px;">edit</span> EDITAR
+                                </button>
+                            ` : ''}
                             <button class="btn-card share" style="padding: 6px 10px; font-size: 10px; min-width: 80px;" onclick="shareWhatsAppDirect('${acc.id}')">
                                 <span class="material-icons-round" style="font-size: 14px;">send</span> WHATSAPP
                             </button>
@@ -733,7 +887,7 @@ function renderPurchases(docs) {
     });
 
     if (filter) {
-        sorted = sorted.filter(d => (d.data().correo || '').toLowerCase().includes(filter));
+        sorted = sorted.filter(d => (d.data().correo || '').toLowerCase().startsWith(filter));
     }
 
     if (sorted.length === 0) {
@@ -767,11 +921,23 @@ function renderPurchases(docs) {
                 <div class="info-grid">
                     <div class="info-item full">
                         <span class="material-icons-round">alternate_email</span>
-                        <div><div class="info-label">Correo</div><div class="info-value">${escapeHtml(data.correo || 'N/A')}</div></div>
+                        <div>
+                            <div class="info-label">Correo</div>
+                            <div class="info-value copyable-text">
+                                ${data.correo ? `<button class="btn-copy-small" onclick="copyToClipboard('${escapeHtml(data.correo)}', 'Correo')"><span class="material-icons-round">content_copy</span></button>` : ''}
+                                <span class="email-tag" style="background: ${getEmailColor(data.correo, getDaysInfo(data.fecha_orden).isExpired)}; color: ${getDaysInfo(data.fecha_orden).isExpired ? 'var(--text)' : getEmailBorderColor(data.correo, getDaysInfo(data.fecha_orden).isExpired)}; border: 1px solid ${getEmailBorderColor(data.correo, getDaysInfo(data.fecha_orden).isExpired)}33;">${escapeHtml(data.correo || 'N/A')}</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="info-item">
                         <span class="material-icons-round">key</span>
-                        <div><div class="info-label">Contraseña</div><div class="info-value">${escapeHtml(data.contrasena || 'N/A')}</div></div>
+                        <div>
+                            <div class="info-label">Contraseña</div>
+                            <div class="info-value copyable-text">
+                                ${data.contrasena ? `<button class="btn-copy-small" onclick="copyToClipboard('${escapeHtml(data.contrasena)}', 'Contraseña')"><span class="material-icons-round">content_copy</span></button>` : ''}
+                                <span class="fade-out">${escapeHtml(data.contrasena || 'N/A')}</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="info-item">
                         <span class="material-icons-round">person</span>
@@ -1001,9 +1167,40 @@ async function deletePurchase(docId) {
 
 // ── WhatsApp ──
 function shareWhatsApp(data) {
-    const { fCStr, fVStr, dias } = getDaysInfo(data.fecha_orden);
+    const msg = getWhatsAppMessage(data);
+    const phone = currentProfileNumber.replace(/\D/g, '');
+    const url = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
+    window.open(url, '_blank');
+}
 
-    // Construimos el mensaje usando concatenación y \n explícitos para mayor compatibilidad
+function getWhatsAppMessage(data, forceIdx = -1) {
+    const { fCStr, fVStr, dias } = getDaysInfo(data.fecha_orden);
+    
+    // Check if there's a custom template for Vencidos
+    let templates = [];
+    try { templates = JSON.parse(localStorage.getItem('wa_templates_vencidos')); } catch(e){}
+    if (!templates || templates.length === 0) templates = window.defaultTemplates || [];
+    
+    let activeIdx = forceIdx >= 0 ? forceIdx : parseInt(localStorage.getItem('wa_template_vencidos_idx') || '0');
+    if (activeIdx >= templates.length) activeIdx = 0;
+    let template = templates[activeIdx] || templates[0];
+    
+    if (dias < 0 && template) {
+        // Use custom template
+        let msg = template;
+        msg = msg.replace(/{SERVICIO}/g, data.tipo_cuenta || "");
+        msg = msg.replace(/{CORREO}/g, data.correo || "");
+        msg = msg.replace(/{PASS}/g, data.contrasena || "");
+        msg = msg.replace(/{PERFIL}/g, data.perfil || "");
+        msg = msg.replace(/{PIN}/g, data.pin || "");
+        msg = msg.replace(/{TIPO}/g, data.usuario || "");
+        msg = msg.replace(/{COMPRA}/g, fCStr);
+        msg = msg.replace(/{VENCE}/g, fVStr);
+        msg = msg.replace(/{DIAS}/g, dias);
+        return msg;
+    }
+
+    // Default Template
     let msg = "\u00A1Hola! Detalles de tu cuenta:\n\n";
     msg += "\uD83D\uDCFA *Servicio:* " + (data.tipo_cuenta || "") + "\n";
     msg += "\u2B50 *Usuario:* " + (data.correo || "") + "\n";
@@ -1015,15 +1212,219 @@ function shareWhatsApp(data) {
     msg += "\uD83D\uDCC6 *Vence:* " + fVStr + "\n";
     msg += "\u23F3 *Quedan:* " + dias + " d\u00EDas\n\n";
     msg += "Gracias! \u2728";
-
-    // Limpiamos el número de teléfono para que solo queden dígitos
-    const phone = currentProfileNumber.replace(/\D/g, '');
-
-    // Usamos api.whatsapp.com que suele ser más estable en navegadores antiguos o específicos
-    const url = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
-
-    window.open(url, '_blank');
+    return msg;
 }
+
+let waEditTargetData = null;
+let waEditActiveTemplateIndex = 0;
+
+function openWhatsAppEditor(docId) {
+    const data = clientsData.find(c => c.id === docId);
+    if (!data) return;
+    
+    waEditTargetData = data;
+    
+    const savedIdx = localStorage.getItem('wa_template_vencidos_idx');
+    waEditActiveTemplateIndex = savedIdx ? parseInt(savedIdx) : 0;
+    
+    renderWaEditTemplateTabs();
+    
+    const msg = getWhatsAppMessage(data, waEditActiveTemplateIndex);
+    $('wa-edit-text').value = msg;
+    $('modal-whatsapp-edit').classList.remove('hidden');
+}
+
+function renderWaEditTemplateTabs() {
+    const tabsContainer = $('wa-edit-template-tabs');
+    if (!tabsContainer) return;
+    
+    let templates = [];
+    try { templates = JSON.parse(localStorage.getItem('wa_templates_vencidos')); } catch(e){}
+    if (!templates || templates.length === 0) templates = window.defaultTemplates || [];
+    
+    if (waEditActiveTemplateIndex >= templates.length) waEditActiveTemplateIndex = 0;
+    
+    let html = '';
+    templates.forEach((_, idx) => {
+        const isDefault = idx < window.defaultTemplates.length;
+        const name = isDefault ? `Idea ${idx + 1}` : `Pers. ${idx - window.defaultTemplates.length + 1}`;
+        html += `<button class="chip ${idx === waEditActiveTemplateIndex ? 'selected' : ''}" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; ${idx === waEditActiveTemplateIndex ? 'background: var(--primary); color: #000; border-color: var(--primary);' : ''}" onclick="event.preventDefault(); window.applyWaEditTemplate(${idx})">${name}</button>`;
+    });
+    
+    tabsContainer.innerHTML = html;
+}
+
+window.applyWaEditTemplate = function(idx) {
+    waEditActiveTemplateIndex = idx;
+    renderWaEditTemplateTabs();
+    const msg = getWhatsAppMessage(waEditTargetData, idx);
+    $('wa-edit-text').value = msg;
+};
+
+$('wa-edit-close-x').addEventListener('click', () => $('modal-whatsapp-edit').classList.add('hidden'));
+$('wa-edit-cancel').addEventListener('click', () => $('modal-whatsapp-edit').classList.add('hidden'));
+$('modal-whatsapp-edit').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-whatsapp-edit').classList.add('hidden'));
+
+$('wa-edit-send').addEventListener('click', () => {
+    const msg = $('wa-edit-text').value;
+    const phone = waEditTargetData.numero_cliente.replace(/\D/g, '');
+    const url = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(msg);
+    window.open(url, '_blank');
+    $('modal-whatsapp-edit').classList.add('hidden');
+});
+
+// ── Template Editor Logic ──
+window.defaultTemplates = [
+`🚨 *¡ACCIÓN REQUERIDA!* Problema con tu cuenta 🚨
+
+Hola, hemos detectado que tu acceso a *{SERVICIO}* ha expirado hoy ({VENCE}).
+
+Para no perder tu cuenta y seguir disfrutando sin interrupciones, por favor renueva lo antes posible.
+👤 *Usuario:* {CORREO}
+🔑 *Contraseña:* {PASS}
+
+Quedo atento para ayudarte con la renovación. ¡Gracias! ✨`,
+
+`👋 ¡Hola! ¿Qué tal?
+
+Te escribo para avisarte que tu mes de *{SERVICIO}* ha concluido el {VENCE}. 
+Espero que hayas disfrutado mucho el servicio. 🍿
+
+Si deseas renovar y mantener tu mismo perfil, confírmame por aquí para enviarte los métodos de pago.
+
+📌 Tus datos actuales:
+Usuario: {CORREO}
+Perfil: {PERFIL} | PIN: {PIN}
+
+¡Quedo a tu disposición! 🚀`,
+
+`⚠️ *AVISO DE CORTE* ⚠️
+
+Tu suscripción de *{SERVICIO}* se encuentra vencida desde el {VENCE} y será suspendida en las próximas horas.
+
+Renueva hoy mismo y conserva tu progreso e historial.
+👉 Cuenta: {CORREO}
+👉 Perfil: {PERFIL}
+
+¡Escríbeme para mantenerla activa! ⏳`
+];
+
+let currentTemplates = [];
+let activeTemplateIndex = 0;
+let confirmingDeleteIdx = -1;
+
+window.selectTemplate = function(idx) {
+    if ($('template-text')) currentTemplates[activeTemplateIndex] = $('template-text').value;
+    activeTemplateIndex = idx;
+    confirmingDeleteIdx = -1;
+    localStorage.setItem('wa_template_vencidos_idx', activeTemplateIndex);
+    $('template-text').value = currentTemplates[activeTemplateIndex] || '';
+    renderTemplateTabs();
+};
+
+window.addNewTemplate = function() {
+    if ($('template-text')) currentTemplates[activeTemplateIndex] = $('template-text').value;
+    currentTemplates.push("Escribe tu nueva idea aquí...\n\nUsuario: {CORREO}");
+    activeTemplateIndex = currentTemplates.length - 1;
+    confirmingDeleteIdx = -1;
+    localStorage.setItem('wa_template_vencidos_idx', activeTemplateIndex);
+    $('template-text').value = currentTemplates[activeTemplateIndex];
+    renderTemplateTabs();
+};
+
+window.promptDeleteTemplate = function(idx) {
+    if (currentTemplates.length <= 1) {
+        toast('Debe quedar al menos una idea de plantilla.');
+        return;
+    }
+    confirmingDeleteIdx = idx;
+    renderTemplateTabs();
+};
+
+window.cancelDeleteTemplate = function() {
+    confirmingDeleteIdx = -1;
+    renderTemplateTabs();
+};
+
+window.deleteTemplate = function(idx) {
+    currentTemplates.splice(idx, 1);
+    if (activeTemplateIndex >= currentTemplates.length) {
+        activeTemplateIndex = currentTemplates.length - 1;
+    } else if (activeTemplateIndex > idx) {
+        activeTemplateIndex--;
+    }
+    confirmingDeleteIdx = -1;
+    localStorage.setItem('wa_template_vencidos_idx', activeTemplateIndex);
+    $('template-text').value = currentTemplates[activeTemplateIndex] || '';
+    renderTemplateTabs();
+    toast('Idea eliminada');
+};
+
+function renderTemplateTabs() {
+    const tabsContainer = $('template-tabs');
+    if (!tabsContainer) return;
+    
+    let html = '';
+    currentTemplates.forEach((_, idx) => {
+        const isDefault = idx < window.defaultTemplates.length;
+        const name = isDefault ? `Idea ${idx + 1}` : `Pers. ${idx - window.defaultTemplates.length + 1}`;
+        
+        if (idx === confirmingDeleteIdx) {
+            html += `
+                <div style="display: flex; flex-direction: column; gap: 4px; background: var(--bg-card); padding: 6px; border-radius: 12px; border: 1px solid var(--danger); box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 100px;">
+                    <button class="chip" style="background: var(--danger); color: white; border-color: var(--danger); white-space: nowrap; font-size: 11px; padding: 6px 12px; width: 100%; justify-content: center;" onclick="event.preventDefault(); window.deleteTemplate(${idx})">Eliminar</button>
+                    <button class="chip" style="background: transparent; border: none; white-space: nowrap; font-size: 11px; padding: 6px 12px; width: 100%; justify-content: center; color: var(--text-dim);" onclick="event.preventDefault(); window.cancelDeleteTemplate()">Cancelar</button>
+                </div>
+            `;
+        } else {
+            html += `<button class="chip ${idx === activeTemplateIndex ? 'selected' : ''}" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; ${idx === activeTemplateIndex ? 'background: var(--primary); color: #000; border-color: var(--primary);' : ''}" onclick="event.preventDefault(); window.selectTemplate(${idx})" oncontextmenu="event.preventDefault(); window.promptDeleteTemplate(${idx})">${name}</button>`;
+        }
+    });
+    
+    html += `<button class="chip" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; background: transparent; border: 1px dashed var(--border);" onclick="event.preventDefault(); window.addNewTemplate()"><span class="material-icons-round" style="font-size: 14px;">add</span> Nueva</button>`;
+    
+    tabsContainer.innerHTML = html;
+}
+
+$('btn-edit-template-vencidos').addEventListener('click', () => {
+    let saved = localStorage.getItem('wa_templates_vencidos');
+    if (saved) {
+        try { currentTemplates = JSON.parse(saved); } catch (e) { currentTemplates = [...window.defaultTemplates]; }
+    } else {
+        currentTemplates = [...window.defaultTemplates];
+        // Migration: If they had a single old template, put it as the first one
+        const oldSaved = localStorage.getItem('wa_template_vencidos');
+        if (oldSaved) {
+            currentTemplates[0] = oldSaved;
+        }
+    }
+    
+    const savedIdx = localStorage.getItem('wa_template_vencidos_idx');
+    activeTemplateIndex = savedIdx ? parseInt(savedIdx) : 0;
+    if (activeTemplateIndex >= currentTemplates.length) activeTemplateIndex = 0;
+    
+    $('template-text').value = currentTemplates[activeTemplateIndex] || '';
+    renderTemplateTabs();
+    
+    $('modal-template-editor').classList.remove('hidden');
+});
+
+$('template-close-x').addEventListener('click', () => $('modal-template-editor').classList.add('hidden'));
+$('template-cancel').addEventListener('click', () => $('modal-template-editor').classList.add('hidden'));
+$('modal-template-editor').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-template-editor').classList.add('hidden'));
+
+$('template-save').addEventListener('click', async () => {
+    const btn = $('template-save');
+    if (btn.disabled) return;
+    
+    currentTemplates[activeTemplateIndex] = $('template-text').value.trim();
+    localStorage.setItem('wa_templates_vencidos', JSON.stringify(currentTemplates));
+    localStorage.setItem('wa_template_vencidos_idx', activeTemplateIndex);
+    
+    toast('¡Plantillas guardadas correctamente!');
+    $('modal-template-editor').classList.add('hidden');
+});
+
 
 // ═══════════════════════════════════════════════
 // SCREEN 3: FORM
