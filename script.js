@@ -19,6 +19,7 @@ const storage = firebase.storage();
 
 // ── State ──
 let currentScreen = 'list';
+let previousScreen = 'list';
 let currentProfileNumber = '';
 let optionsTargetNumber = '';
 let editDocId = '';
@@ -81,7 +82,16 @@ const $$ = sel => document.querySelectorAll(sel);
 // ═══════════════════════════════════════════════
 function showScreen(name) {
     $$('.screen').forEach(s => s.classList.remove('active'));
-    $((`screen-${name}`)).classList.add('active');
+    const screenEl = $(`screen-${name}`);
+    if (screenEl) screenEl.classList.add('active');
+    
+    // Track previous screen if transitioning to a subscreen/detail screen
+    if (name === 'detail' || name === 'form') {
+        if (currentScreen !== 'detail' && currentScreen !== 'form') {
+            previousScreen = currentScreen;
+        }
+    }
+    
     currentScreen = name;
 
     // Update nav active state
@@ -91,6 +101,8 @@ function showScreen(name) {
         else if (currentNavFilter === 'vencidos') $('nav-vencidos').classList.add('active');
     }
     if (name === 'form') $('nav-nuevo').classList.add('active');
+    if (name === 'stats') $('nav-stats').classList.add('active');
+    if (name === 'promociones') $('nav-promociones').classList.add('active');
 
     // Close mobile sidebar
     $('sidebar').classList.remove('open');
@@ -312,6 +324,7 @@ let gastosData = [];
 function initProfileList() {
     unsubProfiles = db.collection('perfiles').orderBy('ultima_actividad', 'desc').onSnapshot(snap => {
         profilesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateStats();
         renderProfiles();
     }, err => {
         console.error("Error al cargar perfiles:", err);
@@ -357,6 +370,8 @@ function updateStats() {
     $('mobile-stat-total').textContent = totalProfiles;
 
     if (currentScreen === 'stats') renderStats();
+    if (currentScreen === 'promociones') renderPromoVuelve();
+    renderPromoNavBadge();
 }
 
 function renderStats() {
@@ -1009,7 +1024,7 @@ $('btn-back-detail').addEventListener('click', () => {
     if (unsubPurchases) { unsubPurchases(); unsubPurchases = null; }
     $('search-detail').value = '';
     currentPurchaseDocs = [];
-    showScreen('list');
+    showScreen(previousScreen || 'list');
 });
 
 // Client options button (in detail header)
@@ -1425,6 +1440,138 @@ $('template-save').addEventListener('click', async () => {
     $('modal-template-editor').classList.add('hidden');
 });
 
+// ── Vuelve Template Editor Logic ──
+window.defaultVuelveTemplates = [
+`Hola podemos hablar? 😔
+
+*Promo migajero* 
+Se comenta por ahí que me extrañas tanto como yo a tus pagos... 💸 ¡digo, a tu presencia! 🤭
+
+✨ ¡Vuelve hoy mismo y actualizo mis precios migajeros por ti! ✨`,
+
+`🔄 *¡Hola! Te tenemos una oferta especial.*
+
+Hemos notado que llevas un tiempo sin renovar tu suscripción.
+
+✨ *¡Vuelve hoy y aprovecha nuestra promo de retorno!*
+
+Escríbenos y te damos más detalles 🎉`
+];
+
+let currentVuelveTemplates = [];
+let activeVuelveTemplateIndex = 0;
+let confirmingVuelveDeleteIdx = -1;
+
+window.selectVuelveTemplate = function(idx) {
+    if ($('template-vuelve-text')) currentVuelveTemplates[activeVuelveTemplateIndex] = $('template-vuelve-text').value;
+    activeVuelveTemplateIndex = idx;
+    confirmingVuelveDeleteIdx = -1;
+    localStorage.setItem('wa_template_vuelve_idx', activeVuelveTemplateIndex);
+    $('template-vuelve-text').value = currentVuelveTemplates[activeVuelveTemplateIndex] || '';
+    renderVuelveTemplateTabs();
+};
+
+window.addNewVuelveTemplate = function() {
+    if ($('template-vuelve-text')) currentVuelveTemplates[activeVuelveTemplateIndex] = $('template-vuelve-text').value;
+    currentVuelveTemplates.push("Escribe tu nueva promo de retorno aquí...\n\nCódigo de descuento para {TELEFONO}");
+    activeVuelveTemplateIndex = currentVuelveTemplates.length - 1;
+    confirmingVuelveDeleteIdx = -1;
+    localStorage.setItem('wa_template_vuelve_idx', activeVuelveTemplateIndex);
+    $('template-vuelve-text').value = currentVuelveTemplates[activeVuelveTemplateIndex];
+    renderVuelveTemplateTabs();
+};
+
+window.promptDeleteVuelveTemplate = function(idx) {
+    if (currentVuelveTemplates.length <= 1) {
+        toast('Debe quedar al menos una idea de plantilla.');
+        return;
+    }
+    confirmingVuelveDeleteIdx = idx;
+    renderVuelveTemplateTabs();
+};
+
+window.cancelDeleteVuelveTemplate = function() {
+    confirmingVuelveDeleteIdx = -1;
+    renderVuelveTemplateTabs();
+};
+
+window.deleteVuelveTemplate = function(idx) {
+    currentVuelveTemplates.splice(idx, 1);
+    if (activeVuelveTemplateIndex >= currentVuelveTemplates.length) {
+        activeVuelveTemplateIndex = currentVuelveTemplates.length - 1;
+    } else if (activeVuelveTemplateIndex > idx) {
+        activeVuelveTemplateIndex--;
+    }
+    confirmingVuelveDeleteIdx = -1;
+    localStorage.setItem('wa_template_vuelve_idx', activeVuelveTemplateIndex);
+    $('template-vuelve-text').value = currentVuelveTemplates[activeVuelveTemplateIndex] || '';
+    renderVuelveTemplateTabs();
+    toast('Idea eliminada');
+};
+
+function renderVuelveTemplateTabs() {
+    const tabsContainer = $('template-vuelve-tabs');
+    if (!tabsContainer) return;
+    
+    let html = '';
+    currentVuelveTemplates.forEach((_, idx) => {
+        const isDefault = idx < window.defaultVuelveTemplates.length;
+        const name = isDefault ? `Idea ${idx + 1}` : `Pers. ${idx - window.defaultVuelveTemplates.length + 1}`;
+        
+        if (idx === confirmingVuelveDeleteIdx) {
+            html += `
+                <div style="display: flex; flex-direction: column; gap: 4px; background: var(--bg-card); padding: 6px; border-radius: 12px; border: 1px solid var(--danger); box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 100px;">
+                    <button class="chip" style="background: var(--danger); color: white; border-color: var(--danger); white-space: nowrap; font-size: 11px; padding: 6px 12px; width: 100%; justify-content: center;" onclick="event.preventDefault(); window.deleteVuelveTemplate(${idx})">Eliminar</button>
+                    <button class="chip" style="background: transparent; border: none; white-space: nowrap; font-size: 11px; padding: 6px 12px; width: 100%; justify-content: center; color: var(--text-dim);" onclick="event.preventDefault(); window.cancelDeleteVuelveTemplate()">Cancelar</button>
+                </div>
+            `;
+        } else {
+            html += `<button class="chip ${idx === activeVuelveTemplateIndex ? 'selected' : ''}" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; ${idx === activeVuelveTemplateIndex ? 'background: var(--primary); color: #000; border-color: var(--primary);' : ''}" onclick="event.preventDefault(); window.selectVuelveTemplate(${idx})" oncontextmenu="event.preventDefault(); window.promptDeleteVuelveTemplate(${idx})">${name}</button>`;
+        }
+    });
+    
+    html += `<button class="chip" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; background: transparent; border: 1px dashed var(--border);" onclick="event.preventDefault(); window.addNewVuelveTemplate()"><span class="material-icons-round" style="font-size: 14px;">add</span> Nueva</button>`;
+    
+    tabsContainer.innerHTML = html;
+}
+
+// Bind Vuelve Template Editor controls
+const btnVuelve = $('btn-edit-template-vuelve');
+if (btnVuelve) {
+    btnVuelve.addEventListener('click', () => {
+        let saved = localStorage.getItem('wa_templates_vuelve');
+        if (saved) {
+            try { currentVuelveTemplates = JSON.parse(saved); } catch (e) { currentVuelveTemplates = [...window.defaultVuelveTemplates]; }
+        } else {
+            currentVuelveTemplates = [...window.defaultVuelveTemplates];
+        }
+        
+        const savedIdx = localStorage.getItem('wa_template_vuelve_idx');
+        activeVuelveTemplateIndex = savedIdx ? parseInt(savedIdx) : 0;
+        if (activeVuelveTemplateIndex >= currentVuelveTemplates.length) activeVuelveTemplateIndex = 0;
+        
+        $('template-vuelve-text').value = currentVuelveTemplates[activeVuelveTemplateIndex] || '';
+        renderVuelveTemplateTabs();
+        
+        $('modal-template-editor-vuelve').classList.remove('hidden');
+    });
+}
+
+$('template-vuelve-close-x').addEventListener('click', () => $('modal-template-editor-vuelve').classList.add('hidden'));
+$('template-vuelve-cancel').addEventListener('click', () => $('modal-template-editor-vuelve').classList.add('hidden'));
+if ($('modal-template-editor-vuelve')) {
+    $('modal-template-editor-vuelve').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-template-editor-vuelve').classList.add('hidden'));
+}
+
+$('template-vuelve-save').addEventListener('click', () => {
+    currentVuelveTemplates[activeVuelveTemplateIndex] = $('template-vuelve-text').value.trim();
+    localStorage.setItem('wa_templates_vuelve', JSON.stringify(currentVuelveTemplates));
+    localStorage.setItem('wa_template_vuelve_idx', activeVuelveTemplateIndex);
+    
+    toast('¡Plantillas Vuelve guardadas correctamente!');
+    $('modal-template-editor-vuelve').classList.add('hidden');
+});
+
 
 // ═══════════════════════════════════════════════
 // SCREEN 3: FORM
@@ -1587,6 +1734,11 @@ async function syncPerfiles() {
 // INIT
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize Vuelve templates if not exists
+    if (!localStorage.getItem('wa_templates_vuelve')) {
+        localStorage.setItem('wa_templates_vuelve', JSON.stringify(window.defaultVuelveTemplates));
+    }
+
     // Anonymous auth — invisible, no login screen
     try {
         await firebase.auth().signInAnonymously();
@@ -1816,3 +1968,750 @@ document.querySelectorAll('.stats-toggle-btn').forEach(btn => {
         updateStats();
     });
 });
+
+// ═══════════════════════════════════════════════
+// PROMOCIONES — PROMO 1: VUELVE OTRA VEZ
+// ═══════════════════════════════════════════════
+
+// Get the most recent purchase date for a client number from clientsData
+function getLastPurchaseDate(numero) {
+    const accounts = clientsData.filter(c => c.numero_cliente === numero);
+    let latest = null;
+    accounts.forEach(c => {
+        const d = parseFecha(c.fecha_orden);
+        if (d && (!latest || d.getTime() > latest.getTime())) latest = d;
+    });
+    return latest;
+}
+
+// Read/write promo_vuelve state from Firestore perfiles doc
+// Fields: vuelve_canje_fecha (Timestamp), estado_timestamp used for WhatsApp state check
+
+// Determine promo state for "Vuelve otra vez":
+// returns { eligible, blocked, daysInactive, daysUntilUnlock, canjeDate }
+function getVuelvePromoState(numero) {
+    // Find profile doc data from profilesData
+    const profile = profilesData.find(p => p.numero === numero) || {};
+    const now = Date.now();
+
+    // 1. Get all accounts for this user number
+    const accounts = clientsData.filter(c => c.numero_cliente === numero);
+
+    // 2. Check if the user has NO accounts at all in clientsData
+    if (accounts.length === 0) {
+        return { eligible: false, blocked: false, daysInactive: 9999, daysUntilUnlock: 0, canjeDate: null };
+    }
+
+    // 3. Check if the user has any active (vigente) account
+    const hasActiveAccount = accounts.some(c => {
+        const { dias } = getDaysInfo(c.fecha_orden);
+        return dias >= 0;
+    });
+
+    if (hasActiveAccount) {
+        // Active users never qualify for the promotion
+        return { eligible: false, blocked: false, daysInactive: 0, daysUntilUnlock: 0, canjeDate: null };
+    }
+
+    // 4. Since all accounts are expired, find the latest expiration date
+    let latestExpiration = null;
+    accounts.forEach(c => {
+        const { fV } = getDaysInfo(c.fecha_orden);
+        if (fV && (!latestExpiration || fV.getTime() > latestExpiration.getTime())) {
+            latestExpiration = fV;
+        }
+    });
+
+    const daysInactive = latestExpiration
+        ? Math.floor((now - latestExpiration.getTime()) / (1000 * 60 * 60 * 24))
+        : 9999;
+
+    // Check lock period (60 days from canje date)
+    const canjeFecha = profile.vuelve_canje_fecha
+        ? (profile.vuelve_canje_fecha.toDate ? profile.vuelve_canje_fecha.toDate() : new Date(profile.vuelve_canje_fecha))
+        : null;
+
+    let blocked = false;
+    let daysUntilUnlock = 0;
+    if (canjeFecha) {
+        const unlock = new Date(canjeFecha.getTime() + 60 * 24 * 60 * 60 * 1000);
+        if (now < unlock.getTime()) {
+            blocked = true;
+            daysUntilUnlock = Math.ceil((unlock.getTime() - now) / (1000 * 60 * 60 * 24));
+        }
+    }
+
+    // Eligible if not blocked and has been inactive since latest expiration for >= 20 days
+    const eligible = !blocked && daysInactive >= 20;
+    return { eligible, blocked, daysInactive, daysUntilUnlock, canjeDate: canjeFecha };
+}
+
+// Render "Vuelve otra vez" grid
+function renderPromoVuelve() {
+    const grid = $('promo-vuelve-grid');
+    const countEl = $('promo-vuelve-count');
+    if (!grid) return;
+
+    // Get all unique client numbers
+    const clientNums = new Set([
+        ...clientsData.map(c => c.numero_cliente),
+        ...profilesData.map(p => p.numero)
+    ].filter(Boolean));
+
+    const eligible = [];
+    const blocked = [];
+
+    clientNums.forEach(num => {
+        const state = getVuelvePromoState(num);
+        if (state.eligible) eligible.push({ num, state });
+        else if (state.blocked) blocked.push({ num, state });
+    });
+
+    // Sort eligible by days inactive (most inactive first)
+    eligible.sort((a, b) => b.state.daysInactive - a.state.daysInactive);
+
+    const all = [...eligible, ...blocked];
+
+    // Update counter badge
+    if (countEl) countEl.textContent = `${eligible.length} cliente${eligible.length !== 1 ? 's' : ''} elegible${eligible.length !== 1 ? 's' : ''}`;
+
+    // Update nav badge
+    const navBadge = $('promo-nav-badge');
+    if (navBadge) {
+        if (eligible.length > 0) {
+            navBadge.textContent = eligible.length;
+            navBadge.style.display = 'inline-flex';
+        } else {
+            navBadge.style.display = 'none';
+        }
+    }
+
+    if (all.length === 0) {
+        grid.innerHTML = `<div class="promo-empty">
+            <span class="material-icons-round">check_circle</span>
+            <p>Todos los clientes están activos</p>
+            <small style="color:var(--text-dim);font-size:12px;">Cuando un cliente lleve más de 20 días sin comprar, aparecerá aquí</small>
+        </div>`;
+        return;
+    }
+    grid.innerHTML = all.map((item, idx) => {
+        const { num, state } = item;
+        const isBlocked = state.blocked;
+        
+        let avatarText = '';
+        let avatarStyle = '';
+        if (isBlocked) {
+            const elapsed = Math.max(0, 60 - state.daysUntilUnlock);
+            avatarText = elapsed;
+            avatarStyle = `background: rgba(74, 222, 128, 0.12); border-color: rgba(74, 222, 128, 0.35); color: #4ADE80;`;
+        } else {
+            avatarText = state.daysInactive < 9999 ? state.daysInactive : '—';
+            avatarStyle = `background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.25); color: #F59E0B;`;
+        }
+        const avatarFontSize = String(avatarText).length > 2 ? '14px' : '18px';
+
+        // Determine if the "estado" (send state) is active for this client
+        // We check if ANY account has an active estado_timestamp
+        const hasActiveEstado = clientsData.some(c =>
+            c.numero_cliente === num && isEstadoActivo(c.estado_timestamp)
+        );
+
+        // WA button: gray if blocked AND estado is marked (sent), else active if eligible
+        // Per spec: button goes gray if estado is checked AND blocked
+        const waGray = isBlocked && hasActiveEstado;
+
+        const chipClass = isBlocked ? 'blocked' : 'inactive';
+        const chipLabel = isBlocked
+            ? `🔒 Bloqueada ${state.daysUntilUnlock}d más`
+            : `${state.daysInactive} días sin comprar`;
+
+        const lockInfo = isBlocked
+            ? `<div class="promo-lock-info">
+                <span class="material-icons-round">lock_clock</span>
+                <span>Bloqueada hasta el canje + 60 días · Desbloqueo en <strong>${state.daysUntilUnlock} días</strong></span>
+               </div>`
+            : '';
+
+        const actionBtn = waGray
+            ? `<button class="promo-wa-btn gray" disabled>
+                <span class="material-icons-round" style="font-size:16px;">block</span>
+                WhatsApp bloqueado
+               </button>`
+            : (isBlocked
+                ? `<button class="promo-wa-btn gray" disabled>
+                    <span class="material-icons-round" style="font-size:16px;">schedule</span>
+                    En período de espera
+                   </button>`
+                : `<div style="display: flex; gap: 8px;">
+                    <button class="promo-wa-btn active" style="flex: 1;" onclick="event.stopPropagation(); openCanjearVuelve('${escapeHtml(num)}')">
+                        <span class="material-icons-round" style="font-size:16px;">send</span>
+                        WhatsApp
+                    </button>
+                    <button class="promo-wa-btn active btn-canjear-green" style="flex: 1; background: linear-gradient(135deg, #10B981, #059669); color: #fff; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);" onclick="event.stopPropagation(); openCanjearOnly('${escapeHtml(num)}')">
+                        <span class="material-icons-round" style="font-size:16px;">done_all</span>
+                        Canjear
+                    </button>
+                   </div>`);
+
+        return `
+        <div class="promo-client-card ${isBlocked ? 'blocked' : ''}" style="animation-delay:${idx * 0.06}s; cursor: pointer;" onclick="openClientDetail('${escapeHtml(num)}')">
+            <div class="promo-card-top">
+                <div class="promo-card-avatar" style="font-size: ${avatarFontSize}; ${avatarStyle}">${avatarText}</div>
+                <div class="promo-card-info">
+                    <div class="promo-card-number">${escapeHtml(phoneFormat(num))}</div>
+                    <div class="promo-card-meta">${clientsData.filter(c => c.numero_cliente === num).length} cuentas · Última compra: ${state.daysInactive < 9999 ? state.daysInactive + 'd atrás' : 'Sin compras'}</div>
+                </div>
+                <span class="promo-days-chip ${chipClass}">${chipLabel}</span>
+            </div>
+            ${lockInfo}
+            <div onclick="event.stopPropagation()">
+                ${actionBtn}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// Canjear Promo "Vuelve otra vez"
+let canjearVuelveTarget = '';
+
+function openCanjearVuelve(num) {
+    canjearVuelveTarget = num;
+    $('canjear-cliente-num').textContent = phoneFormat(num);
+    
+    // Set message preview using template
+    const savedIdx = localStorage.getItem('wa_template_vuelve_idx');
+    const activeIdx = savedIdx ? parseInt(savedIdx) : 0;
+    
+    renderCanjearVuelveTemplateTabs(activeIdx);
+    $('canjear-vuelve-text').value = getVuelvePromoMessage(num, activeIdx);
+    $('modal-canjear-vuelve').classList.remove('hidden');
+}
+
+function getVuelvePromoMessage(num, forceIdx = -1) {
+    let templates = [];
+    try { templates = JSON.parse(localStorage.getItem('wa_templates_vuelve')); } catch(e){}
+    if (!templates || templates.length === 0) templates = window.defaultVuelveTemplates || [];
+    
+    let activeIdx = forceIdx >= 0 ? forceIdx : parseInt(localStorage.getItem('wa_template_vuelve_idx') || '0');
+    if (activeIdx >= templates.length) activeIdx = 0;
+    
+    let template = templates[activeIdx] || templates[0];
+    const state = getVuelvePromoState(num);
+    
+    let msg = template;
+    msg = msg.replace(/{TELEFONO}/g, phoneFormat(num));
+    msg = msg.replace(/{DIAS}/g, state.daysInactive);
+    return msg;
+}
+
+function renderCanjearVuelveTemplateTabs(activeIdx = -1) {
+    const tabsContainer = $('canjear-vuelve-template-tabs');
+    if (!tabsContainer) return;
+    
+    let templates = [];
+    try { templates = JSON.parse(localStorage.getItem('wa_templates_vuelve')); } catch(e){}
+    if (!templates || templates.length === 0) templates = window.defaultVuelveTemplates || [];
+    
+    if (activeIdx === -1) {
+        const savedIdx = localStorage.getItem('wa_template_vuelve_idx');
+        activeIdx = savedIdx ? parseInt(savedIdx) : 0;
+    }
+    if (activeIdx >= templates.length) activeIdx = 0;
+    
+    let html = '';
+    templates.forEach((_, idx) => {
+        const isDefault = idx < window.defaultVuelveTemplates.length;
+        const name = isDefault ? `Idea ${idx + 1}` : `Pers. ${idx - window.defaultVuelveTemplates.length + 1}`;
+        html += `<button class="chip ${idx === activeIdx ? 'selected' : ''}" style="white-space: nowrap; font-size: 12px; padding: 6px 12px; ${idx === activeIdx ? 'background: var(--primary); color: #000; border-color: var(--primary);' : ''}" onclick="event.preventDefault(); window.applyCanjearVuelveTemplate(${idx})">${name}</button>`;
+    });
+    
+    tabsContainer.innerHTML = html;
+}
+
+window.applyCanjearVuelveTemplate = function(idx) {
+    localStorage.setItem('wa_template_vuelve_idx', idx);
+    renderCanjearVuelveTemplateTabs(idx);
+    $('canjear-vuelve-text').value = getVuelvePromoMessage(canjearVuelveTarget, idx);
+};
+
+$('canjear-close-x').addEventListener('click', () => $('modal-canjear-vuelve').classList.add('hidden'));
+$('canjear-cancel').addEventListener('click', () => $('modal-canjear-vuelve').classList.add('hidden'));
+$('modal-canjear-vuelve').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-canjear-vuelve').classList.add('hidden'));
+
+$('canjear-ok').addEventListener('click', async () => {
+    if (!canjearVuelveTarget) return;
+    try {
+        const targetNum = canjearVuelveTarget;
+
+        // Send WhatsApp with the edited text from the textarea
+        const msg = $('canjear-vuelve-text').value;
+        const phone = targetNum.replace(/\D/g, '');
+        const url = 'https://api.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(msg);
+        window.open(url, '_blank');
+
+        toast('✅ Mensaje de promo enviado');
+        $('modal-canjear-vuelve').classList.add('hidden');
+        canjearVuelveTarget = '';
+    } catch (e) {
+        toast('Error: ' + e.message);
+    }
+});
+
+// Canjear Promo "Vuelve otra vez" - Solamente Canje / Bloqueo
+let canjearOnlyTarget = '';
+
+function openCanjearOnly(num) {
+    canjearOnlyTarget = num;
+    $('canjear-only-cliente-num').textContent = phoneFormat(num);
+    $('modal-canjear-vuelve-only').classList.remove('hidden');
+}
+
+$('canjear-only-close-x').addEventListener('click', () => $('modal-canjear-vuelve-only').classList.add('hidden'));
+$('canjear-only-cancel').addEventListener('click', () => $('modal-canjear-vuelve-only').classList.add('hidden'));
+$('modal-canjear-vuelve-only').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-canjear-vuelve-only').classList.add('hidden'));
+
+$('canjear-only-ok').addEventListener('click', async () => {
+    if (!canjearOnlyTarget) return;
+    try {
+        const targetNum = canjearOnlyTarget;
+
+        // Update local memory data instantly to prevent UI flicker/delay
+        const localTimestamp = new Date();
+        const profile = profilesData.find(p => p.numero === targetNum);
+        if (profile) {
+            profile.vuelve_canje_fecha = localTimestamp;
+        } else {
+            profilesData.push({ numero: targetNum, vuelve_canje_fecha: localTimestamp });
+        }
+        renderPromoVuelve();
+
+        // Save the canje date to Firestore profile
+        await db.collection('perfiles').doc(targetNum).set({
+            vuelve_canje_fecha: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        toast('✅ Promo canjeada · Bloqueada 60 días');
+        $('modal-canjear-vuelve-only').classList.add('hidden');
+        canjearOnlyTarget = '';
+        renderPromoVuelve();
+    } catch (e) {
+        toast('Error: ' + e.message);
+    }
+});
+
+// ═══════════════════════════════════════════════
+// PROMOCIONES — PROMO 2: RECOMIENDA Y GANA
+// ═══════════════════════════════════════════════
+
+const CUENTAS_REGALO = ['HBO Max', 'Crunchyroll', 'Paramount', 'Prime Video', 'ChatGPT'];
+let referidosData = [];
+let unsubReferidos = null;
+let refRegaloState = 'HBO Max';
+let editReferidoId = null;
+
+function initReferidos() {
+    unsubReferidos = db.collection('referidos').orderBy('fecha', 'desc').onSnapshot(snap => {
+        referidosData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderReferidosGrid();
+    }, err => {
+        console.error('Error referidos:', err);
+    });
+}
+
+function renderReferidosGrid() {
+    const grid = $('promo-referidos-grid');
+    if (!grid) return;
+
+    if (referidosData.length === 0) {
+        grid.innerHTML = `<div class="promo-empty">
+            <span class="material-icons-round">group_add</span>
+            <p>No hay referidos registrados aún</p>
+            <small style="color:var(--text-dim);font-size:12px;">Registra cuando un cliente recomiende a un amigo</small>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = referidosData.map((ref, idx) => {
+        const monto = parseFloat(ref.monto) || 0;
+        const isEligible = monto >= 10;
+        const entregado = ref.entregado === true;
+
+        let badgeHtml = '';
+        if (!isEligible) {
+            badgeHtml = `<span class="gift-badge ineligible"><span class="material-icons-round" style="font-size:13px;">cancel</span>No elegible (S/${monto.toFixed(2)})</span>`;
+        } else if (entregado) {
+            badgeHtml = `<span class="gift-badge delivered"><span class="material-icons-round" style="font-size:13px;">check_circle</span>Regalo entregado</span>`;
+        } else {
+            badgeHtml = `<span class="gift-badge pending"><span class="material-icons-round" style="font-size:13px;">card_giftcard</span>Pendiente de entrega</span>`;
+        }
+
+        const fechaStr = ref.fecha ? formatDate(ref.fecha.toDate ? ref.fecha.toDate() : new Date(ref.fecha)) : 'N/A';
+        const avatarChar = (ref.recomendador || '').replace(/\D/g, '').slice(-2, -1) || '🎁';
+
+        const toggleBtnLabel = entregado ? '✅ Marcado como entregado' : '🎁 Marcar como entregado';
+        const toggleBtnClass = entregado ? 'btn-toggle-entregado delivered' : 'btn-toggle-entregado';
+
+        return `
+        <div class="referido-card" style="animation-delay:${idx * 0.07}s; cursor: pointer;" onclick="openClientDetail('${escapeHtml(ref.recomendador)}')">
+            <button class="btn-delete-referido" onclick="event.stopPropagation(); deleteReferido('${ref.id}')" title="Eliminar">
+                <span class="material-icons-round" style="font-size:14px;">close</span>
+            </button>
+            <div class="promo-card-top">
+                <div class="referido-card-avatar">${avatarChar}</div>
+                <div class="promo-card-info">
+                    <div class="promo-card-number">${escapeHtml(ref.recomendador || 'N/A')}</div>
+                    <div class="promo-card-meta">Recomendó a: <strong style="color:var(--text);">${escapeHtml(ref.amigo || 'N/A')}</strong></div>
+                    <div class="promo-card-meta">Compra amigo: <strong>S/${monto.toFixed(2)}</strong> · ${fechaStr}</div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                ${badgeHtml}
+                ${isEligible ? `<span style="font-size:12px; color:var(--text-dim);">🎁 ${escapeHtml(ref.cuenta_regalo || 'N/A')}</span>` : ''}
+            </div>
+            ${isEligible ? `<div onclick="event.stopPropagation()"><button class="${toggleBtnClass}" onclick="toggleEntregadoReferido('${ref.id}', ${!entregado})">${toggleBtnLabel}</button></div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+window.deleteReferido = async function(id) {
+    if (!confirm('¿Eliminar este referido?')) return;
+    try {
+        await db.collection('referidos').doc(id).delete();
+        toast('Referido eliminado');
+    } catch (e) { toast('Error: ' + e.message); }
+};
+
+window.toggleEntregadoReferido = async function(id, newVal) {
+    try {
+        await db.collection('referidos').doc(id).update({ entregado: newVal });
+        toast(newVal ? '✅ Marcado como entregado' : 'Marcado como pendiente');
+    } catch (e) { toast('Error: ' + e.message); }
+};
+
+// Referido modal
+function renderRefGiftChips() {
+    const container = $('ref-chips-regalo');
+    if (!container) return;
+    container.innerHTML = CUENTAS_REGALO.map(c => {
+        const sel = refRegaloState === c;
+        const color = getServiceColor(c);
+        const style = sel ? `background:${color}22; border-color:${color}; color:${color}; font-weight:800;` : '';
+        return `<div class="chip ${sel ? 'selected' : ''}" data-regalo="${c}" style="${style}">${c}</div>`;
+    }).join('');
+    container.querySelectorAll('.chip').forEach(ch => {
+        ch.addEventListener('click', () => {
+            refRegaloState = ch.dataset.regalo;
+            renderRefGiftChips();
+        });
+    });
+}
+
+$('btn-add-referido').addEventListener('click', () => {
+    $('ref-recomendador').value = '';
+    $('ref-amigo').value = '';
+    $('ref-monto').value = '';
+    $('ref-entregado').checked = false;
+    refRegaloState = 'HBO Max';
+    editReferidoId = null;
+    renderRefGiftChips();
+    $('modal-referido').classList.remove('hidden');
+});
+
+$('referido-close-x').addEventListener('click', () => $('modal-referido').classList.add('hidden'));
+$('referido-cancel').addEventListener('click', () => $('modal-referido').classList.add('hidden'));
+$('modal-referido').querySelector('.modal-backdrop').addEventListener('click', () => $('modal-referido').classList.add('hidden'));
+
+$('referido-save').addEventListener('click', async () => {
+    const recomendador = $('ref-recomendador').value.trim();
+    const amigo = $('ref-amigo').value.trim();
+    const monto = parseFloat($('ref-monto').value);
+    const entregado = $('ref-entregado').checked;
+
+    if (!recomendador || !amigo) { toast('Ingresa ambos números'); return; }
+    if (isNaN(monto) || monto < 0) { toast('Ingresa un monto válido'); return; }
+
+    try {
+        const data = {
+            recomendador,
+            amigo,
+            monto,
+            cuenta_regalo: refRegaloState,
+            entregado,
+            fecha: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await db.collection('referidos').add(data);
+        toast('✅ Referido guardado');
+        $('modal-referido').classList.add('hidden');
+    } catch (e) { toast('Error: ' + e.message); }
+});
+
+// ═══════════════════════════════════════════════
+// PROMOCIONES — NAV BUTTON
+// ═══════════════════════════════════════════════
+$('nav-promociones').addEventListener('click', () => {
+    currentNavFilter = 'promociones';
+    showScreen('promociones');
+    renderPromoVuelve();
+    renderReferidosGrid();
+    renderPromoRegalito();
+});
+
+function renderPromoNavBadge() {
+    const navBadge = $('promo-nav-badge');
+    if (!navBadge) return;
+    const clientNums = new Set([
+        ...clientsData.map(c => c.numero_cliente),
+        ...profilesData.map(p => p.numero)
+    ].filter(Boolean));
+    let count = 0;
+    clientNums.forEach(num => {
+        const state = getVuelvePromoState(num);
+        if (state.eligible) count++;
+    });
+    if (count > 0) {
+        navBadge.textContent = count;
+        navBadge.style.display = 'inline-flex';
+    } else {
+        navBadge.style.display = 'none';
+    }
+}
+
+// Init referidos listener on page load
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        initReferidos();
+    }, 1200);
+});
+/**
+ * Agrupa compras elegibles en bloques que cumplen:
+ *   • Suma >= 20 soles
+ *   • Diferencia máxima entre compras <= 3 días
+ *   • La compra más reciente del bloque tiene <= 5 días de antigüedad
+ * Cada compra solo puede pertenecer a un bloque.
+ */
+function computeRegalitoGroups(purchases) {
+    // Filtrar solo compras activas, vigentes y sin canjear
+    const active = purchases.filter(p => {
+        if (!p.fecha_orden) return false;
+        const diasInfo = getDaysInfo(p.fecha_orden);
+        const isVigente = diasInfo.dias >= 0;
+        const noCanjeada = !p.estado_regalito || p.estado_regalito !== 'canjeada';
+        return isVigente && noCanjeada;
+    });
+
+    // Ordenar por fecha ascendente
+    active.sort((a, b) => a.fecha_orden.toDate().getTime() - b.fecha_orden.toDate().getTime());
+
+    const groups = [];
+    const used = new Set(); 
+
+    for (let i = 0; i < active.length; i++) {
+        const start = active[i];
+        if (used.has(start.id)) continue; 
+
+        let sum = 0;
+        const block = [];
+        let latest = start.fecha_orden.toDate();
+
+        for (let j = i; j < active.length; j++) {
+            const cur = active[j];
+            if (used.has(cur.id)) continue;
+
+            const diffDays = Math.abs((cur.fecha_orden.toDate().getTime() - start.fecha_orden.toDate().getTime()) / (1000*60*60*24));
+            if (diffDays > 3) break; 
+
+            const price = parseFloat(cur.precio) || 0;
+            sum += price;
+            block.push(cur);
+            if (cur.fecha_orden.toDate() > latest) latest = cur.fecha_orden.toDate();
+
+            if (sum >= 20) {
+                const daysSinceLatest = (Date.now() - latest.getTime()) / (1000*60*60*24);
+                if (daysSinceLatest <= 5) {
+                    const grupoId = start.numero_cliente + '-' + start.id + '-' + latest.getTime();
+                    groups.push({
+                        numero_cliente: start.numero_cliente,
+                        grupo_id: grupoId,
+                        compras_ids: block.map(c => c.id),
+                        monto_total: sum,
+                        estado: 'sin_canjear',
+                        fecha_canje: null,
+                        fecha_expiracion: new Date(latest.getTime() + 5*24*60*60*1000)
+                    });
+                    block.forEach(c => used.add(c.id)); 
+                }
+                break; 
+            }
+        }
+    }
+    return groups;
+}
+
+function renderPromoRegalito() {
+    const container = $('promo-regalito-grid');
+    if (!container) return;
+    
+    syncRegalitoGroups().then(() => {
+        db.collection('promociones_regalito')
+          .where('estado', '==', 'sin_canjear')
+          .get()
+          .then(snap => {
+              const storedGroups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+              
+              const groupsToRender = storedGroups.filter(g => new Date() <= g.fecha_expiracion.toDate());
+              
+              const countEl = $('promo-regalito-count');
+              if (countEl) countEl.textContent = groupsToRender.length + ' bloque' + (groupsToRender.length === 1 ? '' : 's');
+    
+              if (groupsToRender.length === 0) {
+                  container.innerHTML = '<div class="promo-empty"><span class="material-icons-round">hourglass_top</span><p>No hay bloques elegibles por ahora</p></div>';
+                  return;
+              }
+    
+              container.innerHTML = groupsToRender.map(g => {
+                const montoText = g.monto_total;
+                const avatarFontSize = String(montoText).length > 2 ? '14px' : '18px';
+                
+                return `
+                <div class="promo-client-card" style="cursor: default;">
+                    <div class="promo-card-top">
+                        <div class="promo-card-avatar" style="font-size: ${avatarFontSize}; background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.25); color: #10B981;">${montoText}</div>
+                        <div class="promo-card-info">
+                            <div class="promo-card-number">${phoneFormat(g.numero_cliente)}</div>
+                            <div class="promo-card-meta">${g.compras_ids.length} cuentas &bull; Última compra: ${Math.floor((Date.now() - new Date(g.fecha_expiracion.getTime() - 5*24*60*60*1000).getTime()) / (1000*60*60*24))}d atrás</div>
+                        </div>
+                        <span class="promo-days-chip" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #10B981;">S/ ${g.monto_total.toFixed(2)} ganancia</span>
+                    </div>
+                    <div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="promo-wa-btn active" style="flex: 1;" onclick="openWhatsAppFromRegalito('${g.numero_cliente}')">
+                                <span class="material-icons-round" style="font-size:16px;">send</span>
+                                WhatsApp
+                            </button>
+                            <button class="promo-wa-btn active btn-canjear-green" style="flex: 1; background: linear-gradient(135deg, #10B981, #059669); color: #fff; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);" onclick="openCanjearRegalito('${g.id}', '${g.numero_cliente}')">
+                                <span class="material-icons-round" style="font-size:16px;">done_all</span>
+                                Canjear
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+                }).join('');
+          })
+          .catch(e => { toast('Error al cargar regalitos'); console.error(e); });
+    });
+}
+
+function openWhatsAppFromRegalito(clienteNum) {
+    const msg = '¡Hola! 🎁 Tienes un regalito especial en tu cuenta por tus recientes compras. Escríbenos para canjearlo.';
+    const phone = clienteNum.replace(/\D/g, '');
+    const url = 'https://api.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(msg);
+    window.open(url, '_blank');
+}
+
+async function syncRegalitoGroups() {
+    const groups = computeRegalitoGroups(clientsData);
+
+    const batch = db.batch();
+    groups.forEach(g => {
+        const ref = db.collection('promociones_regalito').doc(g.grupo_id);
+        batch.set(ref, {
+            numero_cliente: g.numero_cliente,
+            compras_ids: g.compras_ids,
+            monto_total: g.monto_total,
+            estado: g.estado,
+            fecha_canje: g.fecha_canje,
+            fecha_expiracion: firebase.firestore.Timestamp.fromDate(g.fecha_expiracion)
+        }, { merge: true });
+    });
+    
+    if (groups.length > 0) {
+        await batch.commit();
+    }
+}
+
+let canjearRegalitoTarget = '';
+let canjearRegalitoCliente = '';
+
+function openCanjearRegalito(grupoId, clienteNum) {
+    canjearRegalitoTarget = grupoId;
+    canjearRegalitoCliente = clienteNum;
+    const el = $('canjear-regalito-only-cliente-num');
+    if (el) el.textContent = phoneFormat(clienteNum);
+    const modal = $('modal-canjear-regalito-only');
+    if (modal) modal.classList.remove('hidden');
+}
+
+const closeRegalitoModal = () => {
+    const modal = $('modal-canjear-regalito-only');
+    if (modal) modal.classList.add('hidden');
+};
+
+const elClose = $('canjear-regalito-only-close-x');
+if (elClose) elClose.addEventListener('click', closeRegalitoModal);
+
+const elCancel = $('canjear-regalito-only-cancel');
+if (elCancel) elCancel.addEventListener('click', closeRegalitoModal);
+
+const elOk = $('canjear-regalito-only-ok');
+if (elOk) elOk.addEventListener('click', async () => {
+    if (!canjearRegalitoTarget) return;
+    try {
+        const docRef = db.collection('promociones_regalito').doc(canjearRegalitoTarget);
+        const doc = await docRef.get();
+        if (!doc.exists) { toast('Grupo no encontrado'); return; }
+        const data = doc.data();
+        if (data.estado !== 'sin_canjear') { toast('Ya canjeado o expirado'); return; }
+
+        await docRef.update({
+            estado: 'canjeado',
+            fecha_canje: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        const batch = db.batch();
+        data.compras_ids.forEach(id => {
+            const compraRef = db.collection('clientes').doc(id);
+            batch.update(compraRef, { estado_regalito: 'canjeada' });
+        });
+        await batch.commit();
+
+        toast('✅ Regalito canjeado');
+        closeRegalitoModal();
+        canjearRegalitoTarget = '';
+        renderPromoRegalito();
+    } catch (e) {
+        toast('Error: ' + e.message);
+    }
+});
+
+// Auto-reset "Vuelve otra vez" state for all users (runs once)
+if (!localStorage.getItem('vuelve_reset_done_1')) {
+    setTimeout(async () => {
+        try {
+            console.log("Reiniciando estado de Vuelve otra vez...");
+            const batch = db.batch();
+            const profilesSnap = await db.collection('perfiles').get();
+            let count = 0;
+            profilesSnap.forEach(doc => {
+                if (doc.data().vuelve_canje_fecha) {
+                    batch.update(doc.ref, { vuelve_canje_fecha: firebase.firestore.FieldValue.delete() });
+                    count++;
+                }
+            });
+            const clientsSnap = await db.collection('clientes').get();
+            clientsSnap.forEach(doc => {
+                if (doc.data().estado_timestamp) {
+                    batch.update(doc.ref, { estado_timestamp: firebase.firestore.FieldValue.delete() });
+                    count++;
+                }
+            });
+            if (count > 0) {
+                await batch.commit();
+                console.log(`Reset completo. Limpiados ${count} documentos.`);
+                toast('Estado Vuelve Otra Vez reiniciado para todos ✅');
+            }
+            localStorage.setItem('vuelve_reset_done_1', 'true');
+        } catch (e) {
+            console.error("Error en reset:", e);
+        }
+    }, 4000);
+}

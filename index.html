@@ -43,6 +43,11 @@
                 <span class="material-icons-round">cancel</span>
                 <span>Vencidos</span>
             </button>
+            <button class="nav-item" id="nav-promociones" data-screen="promociones">
+                <span class="material-icons-round">local_offer</span>
+                <span>Promociones</span>
+                <span class="promo-badge" id="promo-nav-badge" style="display:none;"></span>
+            </button>
             <button class="nav-item" id="nav-stats" data-screen="stats">
                 <span class="material-icons-round">insights</span>
                 <span>Estadísticas</span>
@@ -61,7 +66,8 @@
                     <span class="stat-label">Clientes</span>
                 </div>
             </div>
-            <div class="stat-card" id="card-por-vencer" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div class="stat-card" id="card-por-vencer" style="cursor: pointer; transition: transform 0.2s;"
+                onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
                 <span class="material-icons-round stat-icon warning">warning</span>
                 <div>
                     <span class="stat-number" id="stat-expiring">—</span>
@@ -130,7 +136,8 @@
                         <!-- Opciones dinámicas -->
                     </div>
                 </div>
-                <button class="btn-ghost hidden" id="btn-edit-template-vencidos" style="border-color: var(--warning); color: var(--warning);">
+                <button class="btn-ghost hidden" id="btn-edit-template-vencidos"
+                    style="border-color: var(--warning); color: var(--warning);">
                     <span class="material-icons-round">description</span>
                     Plantilla Vencidos
                 </button>
@@ -151,8 +158,9 @@
                             <th>SERVICIO</th>
                             <th onclick="toggleSort('email')" style="cursor: pointer; user-select: none;">
                                 <div style="display: flex; align-items: center; gap: 4px;">
-                                    CORREO 
-                                    <span class="material-icons-round" id="sort-icon-email" style="font-size: 16px; color: var(--text-muted);">unfold_more</span>
+                                    CORREO
+                                    <span class="material-icons-round" id="sort-icon-email"
+                                        style="font-size: 16px; color: var(--text-muted);">unfold_more</span>
                                 </div>
                             </th>
                             <th>CONTRASEÑA</th>
@@ -416,6 +424,88 @@
                 </div>
             </div>
         </section>
+
+        <!-- ============ SCREEN: PROMOCIONES ============ -->
+        <section id="screen-promociones" class="screen">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Promociones</h1>
+                    <p class="page-subtitle">Gestiona ofertas especiales para tus clientes</p>
+                </div>
+                <button class="btn-ghost" id="btn-edit-template-vuelve"
+                    style="border-color: var(--warning); color: var(--warning); display: flex; align-items: center; gap: 8px; padding: 8px 16px;">
+                    <span class="material-icons-round">description</span>
+                    Plantilla Vuelve
+                </button>
+            </div>
+
+            <!-- PROMO 1: VUELVE OTRA VEZ -->
+            <div class="promo-section">
+                <div class="promo-section-header">
+                    <div class="promo-section-icon" style="background: linear-gradient(135deg, #F59E0B, #EF4444);">
+                        <span class="material-icons-round">replay</span>
+                    </div>
+                    <div>
+                        <h2 class="promo-section-title">🔄 Vuelve otra vez</h2>
+                        <p class="promo-section-desc">Clientes sin compra por más de 20 días &bull; Bloqueo 60 días tras
+                            canje</p>
+                    </div>
+                    <div class="promo-count-badge" id="promo-vuelve-count">0 clientes</div>
+                </div>
+                <div class="promo-clients-grid" id="promo-vuelve-grid">
+                    <div class="promo-empty">
+                        <span class="material-icons-round">check_circle</span>
+                        <p>Todos los clientes están activos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROMO 2: TE DEJO UN REGALITO -->
+            <div class="promo-section" style="margin-top: 32px;">
+                <div class="promo-section-header">
+                    <div class="promo-section-icon" style="background: linear-gradient(135deg, #34D399, #10B981);">
+                        <span class="material-icons-round">redeem</span>
+                    </div>
+                    <div>
+                        <h2 class="promo-section-title">🎁 Te dejo un regalito</h2>
+                        <p class="promo-section-desc">Si el cliente suma ≥ S/20 en compras vigentes (máx 3 días entre
+                            ellas, ≤5 días desde la más reciente), la promo se activa. Cada bloque es canjeable una sola
+                            vez.</p>
+                    </div>
+                    <div class="promo-count-badge" id="promo-regalito-count">0 bloques</div>
+                </div>
+                <div class="promo-clients-grid" id="promo-regalito-grid">
+                    <div class="promo-empty">
+                        <span class="material-icons-round">hourglass_top</span>
+                        <p>No hay bloques elegibles por ahora</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROMO 3: RECOMIENDA Y GANA -->
+            <div class="promo-section" style="margin-top: 32px;">
+                <div class="promo-section-header">
+                    <div class="promo-section-icon" style="background: linear-gradient(135deg, #8B5CF6, #3B82F6);">
+                        <span class="material-icons-round">card_giftcard</span>
+                    </div>
+                    <div>
+                        <h2 class="promo-section-title">🎁 Recomienda y Gana</h2>
+                        <p class="promo-section-desc">Cuando un amigo recomendado compra ≥ S/10, el recomendador recibe
+                            una cuenta de regalo</p>
+                    </div>
+                    <button class="btn-primary" id="btn-add-referido" style="margin-left: auto; white-space: nowrap;">
+                        <span class="material-icons-round">add</span>
+                        Registrar Referido
+                    </button>
+                </div>
+                <div class="promo-clients-grid" id="promo-referidos-grid">
+                    <div class="promo-empty">
+                        <span class="material-icons-round">group_add</span>
+                        <p>No hay referidos registrados aún</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ===== MODAL: EDIT RECORD ===== -->
@@ -563,6 +653,113 @@
         <span id="toast-text"></span>
     </div>
 
+    <!-- ===== MODAL: REGISTRAR REFERIDO ===== -->
+    <div class="modal-overlay hidden" id="modal-referido">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel sm">
+            <div class="modal-header">
+                <h2>Registrar Referido</h2>
+                <button class="modal-close" id="referido-close-x"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">Registra quién recomendó a quién.
+                    Si el amigo compra ≥ S/10, el recomendador recibe una cuenta de regalo.</p>
+                <div class="form-group full">
+                    <label><span class="material-icons-round">person</span> Número del Recomendador</label>
+                    <input type="text" id="ref-recomendador" placeholder="+51 900 000 000" autocomplete="off">
+                </div>
+                <div class="form-group full" style="margin-top:12px;">
+                    <label><span class="material-icons-round">person_add</span> Número del Amigo Referido</label>
+                    <input type="text" id="ref-amigo" placeholder="+51 900 000 000" autocomplete="off">
+                </div>
+                <div class="form-group full" style="margin-top:12px;">
+                    <label><span class="material-icons-round">payments</span> Monto de compra del amigo (S/)</label>
+                    <input type="number" id="ref-monto" placeholder="10.00" min="0" step="0.5" autocomplete="off">
+                </div>
+                <div class="form-group full" style="margin-top:12px;">
+                    <label><span class="material-icons-round">card_giftcard</span> Cuenta de regalo</label>
+                    <div class="chips-row" id="ref-chips-regalo" style="margin-top:8px;"></div>
+                </div>
+                <div class="form-group full" style="margin-top:12px;">
+                    <label>
+                        <input type="checkbox" id="ref-entregado"
+                            style="accent-color:var(--primary); width:16px; height:16px; margin-right:8px;">
+                        Regalo ya entregado
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="referido-cancel">Cancelar</button>
+                <button class="btn-primary" id="referido-save">
+                    <span class="material-icons-round">save</span>
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: ENVIAR PROMO VUELVE OTRA VEZ (WHATSAPP) ===== -->
+    <div class="modal-overlay hidden" id="modal-canjear-vuelve">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2>🔄 Enviar Promo Vuelve</h2>
+                <button class="modal-close" id="canjear-close-x"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:14px; margin-bottom:12px;">Previsualiza y edita el mensaje para <strong
+                        id="canjear-cliente-num"></strong>. Al enviar no se aplicará bloqueo aún.</p>
+
+                <div class="template-tabs" id="canjear-vuelve-template-tabs"
+                    style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
+                    <!-- Botones generados en JS -->
+                </div>
+
+                <div class="form-group full">
+                    <label><span class="material-icons-round">chat</span> Mensaje a Enviar</label>
+                    <textarea id="canjear-vuelve-text"
+                        style="width: 100%; height: 220px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="canjear-cancel">Cancelar</button>
+                <button class="btn-primary" id="canjear-ok"
+                    style="background: linear-gradient(135deg, #F59E0B, #EF4444); color: #000;">
+                    <span class="material-icons-round">send</span>
+                    Enviar a WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: CANJEAR PROMO VUELVE OTRA VEZ (BLOQUEO) ===== -->
+    <div class="modal-overlay hidden" id="modal-canjear-vuelve-only">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel sm">
+            <div class="modal-header">
+                <h2>🔄 Confirmar Canje de Promo</h2>
+                <button class="modal-close" id="canjear-only-close-x"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:14px; margin-bottom:16px;">¿Confirmas que el cliente <strong
+                        id="canjear-only-cliente-num"></strong> usó y canjeó la promoción <em>Vuelve otra vez</em>?</p>
+                <p style="font-size:13px; color:var(--text-dim);">Al confirmar, la promoción quedará bloqueada 60 días
+                    para este cliente y se guardará la fecha exacta del canje.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="canjear-only-cancel">Cancelar</button>
+                <button class="btn-primary" id="canjear-only-ok"
+                    style="background: linear-gradient(135deg, #10B981, #059669); color: white;">
+                    <span class="material-icons-round">check</span>
+                    Confirmar Canje
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== MOBILE OVERLAY ===== -->
     <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
 
@@ -581,23 +778,64 @@
         <div class="modal-panel">
             <div class="modal-header">
                 <h2>Plantilla de WhatsApp (Vencidos)</h2>
-                <button class="modal-close" id="template-close-x"><span class="material-icons-round">close</span></button>
+                <button class="modal-close" id="template-close-x"><span
+                        class="material-icons-round">close</span></button>
             </div>
             <div class="modal-body">
-                <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">Usa los siguientes tags para datos dinámicos:<br>
-                <code style="color: var(--primary)">{SERVICIO}, {CORREO}, {PASS}, {PERFIL}, {PIN}, {TIPO}, {COMPRA}, {VENCE}, {DIAS}</code></p>
-                
-                <div class="template-tabs" id="template-tabs" style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
+                <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">Usa los siguientes tags para
+                    datos dinámicos:<br>
+                    <code
+                        style="color: var(--primary)">{SERVICIO}, {CORREO}, {PASS}, {PERFIL}, {PIN}, {TIPO}, {COMPRA}, {VENCE}, {DIAS}</code>
+                </p>
+
+                <div class="template-tabs" id="template-tabs"
+                    style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
                     <!-- Botones generados en JS -->
                 </div>
 
                 <div class="form-group full">
-                    <textarea id="template-text" style="width: 100%; height: 200px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
+                    <textarea id="template-text"
+                        style="width: 100%; height: 200px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-ghost" id="template-cancel">Cancelar</button>
                 <button class="btn-primary" id="template-save" style="background: var(--warning); color: #000;">
+                    <span class="material-icons-round">save</span>
+                    Guardar Plantilla
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL: EDIT WHATSAPP TEMPLATE (VUELVE) ===== -->
+    <div class="modal-overlay hidden" id="modal-template-editor-vuelve">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <h2>Plantilla de WhatsApp (Vuelve otra vez)</h2>
+                <button class="modal-close" id="template-vuelve-close-x"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">Usa los siguientes tags para
+                    datos dinámicos:<br>
+                    <code style="color: var(--primary)">{TELEFONO}, {DIAS}</code>
+                </p>
+
+                <div class="template-tabs" id="template-vuelve-tabs"
+                    style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
+                    <!-- Botones generados en JS -->
+                </div>
+
+                <div class="form-group full">
+                    <textarea id="template-vuelve-text"
+                        style="width: 100%; height: 200px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="template-vuelve-cancel">Cancelar</button>
+                <button class="btn-primary" id="template-vuelve-save" style="background: var(--warning); color: #000;">
                     <span class="material-icons-round">save</span>
                     Guardar Plantilla
                 </button>
@@ -611,15 +849,18 @@
         <div class="modal-panel">
             <div class="modal-header">
                 <h2>Editar Mensaje de WhatsApp</h2>
-                <button class="modal-close" id="wa-edit-close-x"><span class="material-icons-round">close</span></button>
+                <button class="modal-close" id="wa-edit-close-x"><span
+                        class="material-icons-round">close</span></button>
             </div>
             <div class="modal-body">
-                <div class="template-tabs" id="wa-edit-template-tabs" style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
+                <div class="template-tabs" id="wa-edit-template-tabs"
+                    style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin;">
                     <!-- Botones generados en JS -->
                 </div>
                 <div class="form-group full">
                     <label><span class="material-icons-round">chat</span> Mensaje Personalizado</label>
-                    <textarea id="wa-edit-text" style="width: 100%; height: 250px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
+                    <textarea id="wa-edit-text"
+                        style="width: 100%; height: 250px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); padding: 16px; font-family: var(--font); resize: none;"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -687,6 +928,34 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
     <script src="script.js"></script>
+
+
+    <!-- Modal: Confirmar canje de bloque Regalito -->
+    <div class="modal-overlay hidden" id="modal-canjear-regalito-only">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel sm">
+            <div class="modal-header">
+                <h2>🔄 Confirmar Canje de Regalito</h2>
+                <button class="modal-close" id="canjear-regalito-only-close-x"><span
+                        class="material-icons-round">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:14px; margin-bottom:16px;">¿Confirmas que el cliente <strong
+                        id="canjear-regalito-only-cliente-num"></strong> usó y canjeó la promoción <em>Te dejo un
+                        regalito</em>?</p>
+                <p style="font-size:13px; color:var(--text-dim);">Al confirmar, la promoción quedará bloqueada 60 días
+                    para este cliente y se guardará la fecha exacta del canje.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost" id="canjear-regalito-only-cancel">Cancelar</button>
+                <button class="btn-primary" id="canjear-regalito-only-ok"
+                    style="background: linear-gradient(135deg, #10B981, #059669); color: white;">
+                    <span class="material-icons-round">check</span>
+                    Confirmar Canje
+                </button>
+            </div>
+        </div>
+    </div>
 
 </body>
 
